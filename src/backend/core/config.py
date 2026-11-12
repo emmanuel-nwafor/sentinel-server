@@ -1,0 +1,70 @@
+import os
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    PROJECT_NAME: str = "Sentinel Unified AI Backend"
+    VERSION: str = "0.3.0"
+    ENVIRONMENT: str = "development"
+    PORT: int = 8000
+    HOST: str = "0.0.0.0"
+
+    # PostgreSQL Database URL
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/sentinel_db"
+    # Fallback SQLite Async for local testing when Postgres is not running locally
+    SQLITE_FALLBACK_URL: str = "sqlite+aiosqlite:///./sentinel.db"
+
+    # Security & Auth
+    JWT_SECRET: str = "sentinel_super_secret_jwt_key_2026"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    TOKEN_ENCRYPTION_KEY: str = ""  # Optional Fernet key; derives from JWT_SECRET in dev if empty
+
+    # Email & OTP Verification
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = "Sentinel <noreply@sentinel.app>"
+    OTP_EXPIRE_MINUTES: int = 10
+    OTP_RESEND_COOLDOWN_SECONDS: int = 60
+    OTP_MAX_ATTEMPTS: int = 5
+
+    # LLM Settings
+    GEMINI_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
+
+    # Redis & Task Queue
+    REDIS_URL: str = "redis://localhost:6379"
+
+    # Cloudinary & Mux Tools
+    CLOUDINARY_CLOUD_NAME: str = "sentinel_demo_cloud"
+    CLOUDINARY_API_KEY: str = "123456789012345"
+    CLOUDINARY_API_SECRET: str = "sentinel_cloudinary_secret_key"
+    MUX_TOKEN_ID: str = "sentinel_mux_token_id"
+    MUX_TOKEN_SECRET: str = "sentinel_mux_token_secret"
+
+    # Social Login & Publishing OAuth App Credentials (app-level keys, not user tokens)
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/oauth/google/callback"
+
+    LINKEDIN_CLIENT_ID: str = ""
+    LINKEDIN_CLIENT_SECRET: str = ""
+    LINKEDIN_REDIRECT_URI: str = "http://localhost:8000/api/v1/social/callback/linkedin"
+    LINKEDIN_API_VERSION: str = "202501"
+
+    X_CLIENT_ID: str = ""
+    X_CLIENT_SECRET: str = ""
+    X_REDIRECT_URI: str = "http://localhost:8000/api/v1/social/callback/x"
+    X_API_KEY: str = ""
+    X_API_SECRET: str = ""
+    X_ACCESS_TOKEN: str = ""
+    X_ACCESS_SECRET: str = ""
+
+    META_APP_ID: str = ""
+    META_APP_SECRET: str = ""
+    META_REDIRECT_URI: str = "http://localhost:8000/api/v1/social/callback/instagram"
+    META_GRAPH_API_VERSION: str = "v22.0"
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+
+settings = Settings()
