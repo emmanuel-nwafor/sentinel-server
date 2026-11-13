@@ -5,6 +5,9 @@ from backend.repositories.post_repository import IPostRepository
 from backend.repositories.social_account_repository import ISocialAccountRepository
 from backend.repositories.email_otp_repository import IEmailOtpRepository
 from backend.repositories.oauth_identity_repository import IOAuthIdentityRepository
+from backend.repositories.customer_repository import ICustomerRepository
+from backend.repositories.conversation_repository import IConversationRepository
+from backend.repositories.message_repository import IMessageRepository
 
 
 class IUnitOfWork(ABC):
@@ -18,6 +21,9 @@ class IUnitOfWork(ABC):
     social_accounts: ISocialAccountRepository
     email_otps: IEmailOtpRepository
     oauth_identities: IOAuthIdentityRepository
+    customers: ICustomerRepository
+    conversations: IConversationRepository
+    messages: IMessageRepository
 
     @abstractmethod
     async def __aenter__(self) -> Self:

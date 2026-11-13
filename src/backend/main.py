@@ -7,6 +7,7 @@ from backend.api.auth import router as auth_router
 from backend.api.posts import router as posts_router
 from backend.api.media import router as media_router
 from backend.api.social import router as social_router
+from backend.api.inbox import router as inbox_router
 
 
 @asynccontextmanager
@@ -39,6 +40,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(posts_router, prefix="/api/v1")
 app.include_router(media_router, prefix="/api/v1")
 app.include_router(social_router, prefix="/api/v1")
+app.include_router(inbox_router, prefix="/api/v1")
 
 
 @app.get("/health")

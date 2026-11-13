@@ -15,6 +15,18 @@ from backend.repositories.oauth_identity_repository import (
     OAuthIdentityRepository,
     IOAuthIdentityRepository,
 )
+from backend.repositories.customer_repository import (
+    CustomerRepository,
+    ICustomerRepository,
+)
+from backend.repositories.conversation_repository import (
+    ConversationRepository,
+    IConversationRepository,
+)
+from backend.repositories.message_repository import (
+    MessageRepository,
+    IMessageRepository,
+)
 
 
 class SqlAlchemyUnitOfWork(IUnitOfWork):
@@ -32,6 +44,9 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.social_accounts: ISocialAccountRepository = SocialAccountRepository(self._session)
         self.email_otps: IEmailOtpRepository = EmailOtpRepository(self._session)
         self.oauth_identities: IOAuthIdentityRepository = OAuthIdentityRepository(self._session)
+        self.customers: ICustomerRepository = CustomerRepository(self._session)
+        self.conversations: IConversationRepository = ConversationRepository(self._session)
+        self.messages: IMessageRepository = MessageRepository(self._session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:

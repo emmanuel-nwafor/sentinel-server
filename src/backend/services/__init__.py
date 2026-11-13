@@ -20,6 +20,12 @@ from backend.services.voice_service import (
     MAX_AUDIO_SIZE_BYTES,
 )
 
+from backend.services.reply_dispatcher import (
+    ISocialReplyDispatcher,
+    ReplyDispatcherFactory,
+    ReplyDeliveryError,
+)
+
 __all__ = [
     "IEmailService",
     "ConsoleEmailService",
@@ -36,4 +42,7 @@ __all__ = [
     "VoiceTranscriptionError",
     "SUPPORTED_AUDIO_MIMES",
     "MAX_AUDIO_SIZE_BYTES",
+    "ISocialReplyDispatcher",
+    "ReplyDispatcherFactory",
+    "ReplyDeliveryError",
 ]

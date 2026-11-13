@@ -7,6 +7,8 @@ if TYPE_CHECKING:
     from backend.models.post import PostModel
     from backend.models.social_account import SocialAccountModel
     from backend.models.oauth_identity import OAuthIdentityModel
+    from backend.models.customer import CustomerModel
+    from backend.models.conversation import ConversationModel
 
 
 class UserModel(Base):
@@ -37,6 +39,22 @@ class UserModel(Base):
     # Relationship to external OAuth login identities
     oauth_identities: Mapped[List["OAuthIdentityModel"]] = relationship(
         "OAuthIdentityModel",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # Relationship to customers across platforms
+    customers: Mapped[List["CustomerModel"]] = relationship(
+        "CustomerModel",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # Relationship to inbox conversations
+    conversations: Mapped[List["ConversationModel"]] = relationship(
+        "ConversationModel",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="selectin",
