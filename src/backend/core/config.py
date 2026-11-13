@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     # Email & OTP Verification
     RESEND_API_KEY: str = ""
+    BREVO_API_KEY: str = ""
+    BREVO_SENDER_EMAIL: str = ""
     EMAIL_FROM: str = "Sentinel <noreply@sentinel.app>"
     OTP_EXPIRE_MINUTES: int = 10
     OTP_RESEND_COOLDOWN_SECONDS: int = 60

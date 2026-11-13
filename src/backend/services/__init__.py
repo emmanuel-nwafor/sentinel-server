@@ -2,6 +2,7 @@ from backend.services.email_service import (
     IEmailService,
     ConsoleEmailService,
     ResendEmailService,
+    BrevoEmailService,
     EmailDeliveryError,
     get_email_service,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "IEmailService",
     "ConsoleEmailService",
     "ResendEmailService",
+    "BrevoEmailService",
     "EmailDeliveryError",
     "get_email_service",
     "GoogleOAuthClient",
