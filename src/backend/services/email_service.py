@@ -2,12 +2,13 @@ from abc import ABC, abstractmethod
 import logging
 import httpx
 from backend.core.config import settings
+from backend.services.email_template_service import email_renderer
 
 logger = logging.getLogger(__name__)
 
 
 class EmailDeliveryError(Exception):
-    """Raised when an external email provider fails to deliver an OTP email."""
+    """Raised when an external email provider fails to deliver an email."""
 
 
 class IEmailService(ABC):
@@ -15,25 +16,42 @@ class IEmailService(ABC):
 
     @abstractmethod
     async def send_otp_email(self, to_email: str, user_name: str, otp_code: str) -> None:
+        """Deliver a 6-digit verification code email."""
+        pass
+
+    @abstractmethod
+    async def send_welcome_email(self, to_email: str, user_name: str) -> None:
+        """Deliver a welcome onboarding email to a newly verified user."""
         pass
 
 
 class ConsoleEmailService(IEmailService):
     """
     Development Email Service.
-    Prints the 6-digit OTP to the server terminal when RESEND_API_KEY is not configured.
+    Prints rendered email alerts to the terminal when no external provider is configured.
     """
 
     async def send_otp_email(self, to_email: str, user_name: str, otp_code: str) -> None:
         banner = (
             f"\n{'=' * 54}\n"
-            f"  [DEV EMAIL] Sentinel Verification OTP\n"
+            f"  [DEV EMAIL] Dispatch Verification OTP\n"
             f"  To: {user_name} <{to_email}>\n"
             f"  Code: {otp_code}  (expires in {settings.OTP_EXPIRE_MINUTES} minutes)\n"
             f"{'=' * 54}\n"
         )
         print(banner, flush=True)
         logger.info("Sent dev OTP email to %s", to_email)
+
+    async def send_welcome_email(self, to_email: str, user_name: str) -> None:
+        banner = (
+            f"\n{'=' * 54}\n"
+            f"  [DEV EMAIL] Welcome to Dispatch!\n"
+            f"  To: {user_name} <{to_email}>\n"
+            f"  Welcome message delivered to newly verified user.\n"
+            f"{'=' * 54}\n"
+        )
+        print(banner, flush=True)
+        logger.info("Sent dev welcome email to %s", to_email)
 
 
 class ResendEmailService(IEmailService):
@@ -45,13 +63,7 @@ class ResendEmailService(IEmailService):
         self._api_key = api_key
         self._sender = sender
 
-    async def send_otp_email(self, to_email: str, user_name: str, otp_code: str) -> None:
-        html_body = (
-            f"<p>Hi {user_name},</p>"
-            f"<p>Your Sentinel verification code is: "
-            f"<strong style='font-size:20px;letter-spacing:3px;'>{otp_code}</strong></p>"
-            f"<p>This code expires in {settings.OTP_EXPIRE_MINUTES} minutes.</p>"
-        )
+    async def _send(self, to_email: str, subject: str, html_content: str) -> None:
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
                 self.RESEND_API_URL,
@@ -62,14 +74,34 @@ class ResendEmailService(IEmailService):
                 json={
                     "from": self._sender,
                     "to": [to_email],
-                    "subject": "Your Sentinel Verification Code",
-                    "html": html_body,
+                    "subject": subject,
+                    "html": html_content,
                 },
             )
             if resp.status_code >= 400:
                 raise EmailDeliveryError(
                     f"Resend API error ({resp.status_code}): {resp.text}"
                 )
+
+    async def send_otp_email(self, to_email: str, user_name: str, otp_code: str) -> None:
+        html_body = email_renderer.render_otp(
+            user_name=user_name,
+            otp_code=otp_code,
+            expire_minutes=settings.OTP_EXPIRE_MINUTES,
+        )
+        await self._send(
+            to_email=to_email,
+            subject=f"{otp_code} is your Dispatch verification code",
+            html_content=html_body,
+        )
+
+    async def send_welcome_email(self, to_email: str, user_name: str) -> None:
+        html_body = email_renderer.render_welcome(user_name=user_name)
+        await self._send(
+            to_email=to_email,
+            subject=f"Welcome to Dispatch, {user_name}! 🚀",
+            html_content=html_body,
+        )
 
 
 class BrevoEmailService(IEmailService):
@@ -82,23 +114,11 @@ class BrevoEmailService(IEmailService):
         self._sender_email = sender_email
         self._sender_name = sender_name
 
-    async def send_otp_email(self, to_email: str, user_name: str, otp_code: str) -> None:
-        html_content = (
-            f"<div style='font-family:sans-serif;max-width:500px;margin:auto;padding:24px;border:1px solid #eaeaea;border-radius:12px;'>"
-            f"<h2 style='color:#111;'>Dispatch Verification</h2>"
-            f"<p style='color:#555;'>Hi {user_name},</p>"
-            f"<p style='color:#555;'>Your 6-digit Dispatch verification code is:</p>"
-            f"<div style='background:#f4f4f5;padding:16px;text-align:center;font-size:28px;font-weight:bold;letter-spacing:6px;border-radius:8px;color:#09090b;margin:20px 0;'>"
-            f"{otp_code}"
-            f"</div>"
-            f"<p style='color:#777;font-size:13px;'>This code expires in {settings.OTP_EXPIRE_MINUTES} minutes. If you did not request this code, please ignore this email.</p>"
-            f"</div>"
-        )
-
+    async def _send(self, to_email: str, to_name: str, subject: str, html_content: str) -> None:
         payload = {
             "sender": {"name": self._sender_name, "email": self._sender_email},
-            "to": [{"email": to_email, "name": user_name}],
-            "subject": f"{otp_code} is your Dispatch verification code",
+            "to": [{"email": to_email, "name": to_name}],
+            "subject": subject,
             "htmlContent": html_content,
         }
 
@@ -115,7 +135,33 @@ class BrevoEmailService(IEmailService):
             if resp.status_code >= 400:
                 logger.error("Brevo API error (%d): %s", resp.status_code, resp.text)
                 raise EmailDeliveryError(f"Brevo email delivery failed ({resp.status_code}): {resp.text}")
-            logger.info("Sent real Brevo OTP email to %s", to_email)
+
+    async def send_otp_email(self, to_email: str, user_name: str, otp_code: str) -> None:
+        html_content = email_renderer.render_otp(
+            user_name=user_name,
+            otp_code=otp_code,
+            expire_minutes=settings.OTP_EXPIRE_MINUTES,
+        )
+        await self._send(
+            to_email=to_email,
+            to_name=user_name,
+            subject=f"{otp_code} is your Dispatch verification code",
+            html_content=html_content,
+        )
+        logger.info("Sent Dispatch OTP email to %s", to_email)
+
+    async def send_welcome_email(self, to_email: str, user_name: str) -> None:
+        html_content = email_renderer.render_welcome(
+            user_name=user_name,
+            dashboard_url="https://dispatch.io",
+        )
+        await self._send(
+            to_email=to_email,
+            to_name=user_name,
+            subject=f"Welcome to Dispatch, {user_name}! 🚀",
+            html_content=html_content,
+        )
+        logger.info("Sent Dispatch welcome onboarding email to %s", to_email)
 
 
 def get_email_service() -> IEmailService:

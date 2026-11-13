@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -33,6 +34,7 @@ from backend.unit_of_work.base import IUnitOfWork
 from backend.api.deps import get_current_user, get_uow
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
 
 
 def _serialize_user(user: UserModel) -> UserResponse:
@@ -145,6 +147,16 @@ async def verify_otp(request: VerifyOtpRequest, uow: IUnitOfWork = Depends(get_u
     user.is_verified = True
     await uow.email_otps.delete_by_user_id(user.id)
     await uow.commit()
+
+    # Deliver Dispatch welcome onboarding email
+    email_service = get_email_service()
+    try:
+        await email_service.send_welcome_email(
+            to_email=user.email,
+            user_name=user.name,
+        )
+    except Exception as exc:
+        logger.warning("Could not deliver welcome email to %s: %s", user.email, exc)
 
     return VerifyOtpResponse(
         message="Email verified successfully. You can now log in.",

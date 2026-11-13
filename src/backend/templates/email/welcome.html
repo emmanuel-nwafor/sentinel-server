@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="text-align: center; margin-bottom: 24px;">
+  <div style="display: inline-block; width: 56px; height: 56px; line-height: 56px; border-radius: 50%; background-color: #ecfdf5; font-size: 28px; margin-bottom: 12px;">
+    🎉
+  </div>
+  <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px;">
+    Welcome to Dispatch, {{ user_name }}!
+  </h1>
+  <p style="margin: 0; font-size: 15px; color: #64748b;">
+    Your account has been successfully verified. You're ready to supercharge your business.
+  </p>
+</div>
+
+<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+  <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #0f172a;">
+    Here is what you can do right now with Dispatch:
+  </p>
+  <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8; color: #475569;">
+    <li><strong>Voice-to-Post Pipeline:</strong> Turn 30-second voice notes into viral LinkedIn, X, and Instagram posts.</li>
+    <li><strong>Multi-Channel Publishing:</strong> Publish and schedule directly to LinkedIn, X, and Instagram with 100% server-side automation.</li>
+    <li><strong>Unified Social Inbox:</strong> Manage customer DMs and inquiries across all platforms in one clean feed with AI suggestion co-pilots.</li>
+  </ul>
+</div>
+
+<div style="text-align: center; margin: 32px 0 16px 0;">
+  <a href="{{ dashboard_url }}" style="display: inline-block; background-color: #09090b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+    Go to Dashboard &rarr;
+  </a>
+</div>
+
+<p style="margin: 24px 0 0 0; font-size: 13px; line-height: 1.6; color: #94a3b8; text-align: center;">
+  Need a hand getting started? Check out our documentation or drop us a line anytime.
+</p>
+{% endblock %}
