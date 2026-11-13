@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 from typing import List, Optional
+import os
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, Form, UploadFile
 from backend.models.user import UserModel
 from backend.models.post import PostModel
 from backend.unit_of_work.base import IUnitOfWork
@@ -9,6 +10,7 @@ from backend.api.deps import get_uow, get_current_user
 from backend.schemas.content import (
     ContentGenerationRequest,
     ContentGenerationResponse,
+    VoicePostGenerationResponse,
     WorkspaceType,
     PostStatus,
 )
@@ -16,6 +18,12 @@ from backend.schemas.post_ops import UpdatePostRequest, SchedulePostRequest, Pos
 from backend.agents.content_operator import ContentOperatorAgent
 from backend.tools.media_and_social import CloudinaryTool
 from backend.tools.publishers import SocialPublishingService
+from backend.services.voice_service import (
+    VoiceTranscriberFactory,
+    VoiceTranscriptionError,
+    SUPPORTED_AUDIO_MIMES,
+    MAX_AUDIO_SIZE_BYTES,
+)
 
 router = APIRouter(prefix="/posts", tags=["Post Operations"])
 
@@ -103,6 +111,135 @@ async def generate_post(
 
     return ContentGenerationResponse(
         post_id=str(new_post.id),
+        plan=plan,
+        media=final_media,
+        status=PostStatus.DRAFT,
+    )
+
+
+@router.post(
+    "/voice-draft",
+    response_model=VoicePostGenerationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def generate_post_from_voice(
+    audio: UploadFile = File(..., description="Recorded audio voice memo (.m4a, .mp3, .wav, .aac, .ogg)"),
+    workspace: WorkspaceType = Form(default=WorkspaceType.CONTENT),
+    generate_image_prompt: bool = Form(default=False),
+    instructions: Optional[str] = Form(default=None, description="Optional extra instructions, e.g. tone or CTA"),
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Speech-to-Text Voice-to-Post:
+    Accepts recorded voice audio from mobile, transcribes the spoken message,
+    and automatically synthesizes tailored LinkedIn, X, and Instagram drafts.
+    """
+    filename = (audio.filename or "recording.m4a").lower()
+    raw_content_type = (audio.content_type or "").lower().split(";")[0].strip()
+
+    valid_extensions = {".mp3", ".m4a", ".wav", ".aac", ".ogg", ".webm", ".flac"}
+    file_ext = os.path.splitext(filename)[1]
+
+    if raw_content_type in SUPPORTED_AUDIO_MIMES:
+        mime_type = raw_content_type
+    elif file_ext in valid_extensions:
+        ext_to_mime = {
+            ".mp3": "audio/mp3",
+            ".m4a": "audio/m4a",
+            ".wav": "audio/wav",
+            ".aac": "audio/aac",
+            ".ogg": "audio/ogg",
+            ".webm": "audio/webm",
+            ".flac": "audio/flac",
+        }
+        mime_type = ext_to_mime.get(file_ext, "audio/mp4")
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported audio type '{audio.content_type}'. Supported formats: .m4a, .mp3, .wav, .aac, .ogg, .webm",
+        )
+
+    audio_bytes = await audio.read()
+    if not audio_bytes or len(audio_bytes) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The uploaded audio file is empty.",
+        )
+
+    if len(audio_bytes) > MAX_AUDIO_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Audio file exceeds {MAX_AUDIO_SIZE_BYTES // (1024 * 1024)} MB limit.",
+        )
+
+    transcriber = VoiceTranscriberFactory.get_transcriber()
+    try:
+        transcription = await transcriber.transcribe(audio_bytes, mime_type)
+    except VoiceTranscriptionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    combined_prompt = transcription
+    if instructions and instructions.strip():
+        combined_prompt = f"{transcription}\n\nAdditional Guidance: {instructions.strip()}"
+
+    content_req = ContentGenerationRequest(
+        prompt=combined_prompt,
+        workspace=workspace,
+        generate_image_prompt=generate_image_prompt,
+    )
+    plan = await agent.execute(content_req)
+
+    final_media = None
+    if generate_image_prompt and plan.suggested_media_prompt:
+        final_media = cloudinary_tool.create_placeholder_ai_asset(plan.suggested_media_prompt)
+
+    new_post = PostModel(
+        user_id=current_user.id,
+        workspace=workspace.value,
+        status=PostStatus.DRAFT.value,
+        original_prompt=transcription,
+        linkedin_variant={
+            "formatted_text": plan.linkedin.formatted_text,
+            "headline": plan.linkedin.headline,
+            "body": plan.linkedin.body,
+            "call_to_action": plan.linkedin.call_to_action,
+            "hashtags": plan.linkedin.hashtags,
+        },
+        x_variant={
+            "formatted_text": plan.x.formatted_text,
+            "text": plan.x.text,
+            "hashtags": plan.x.hashtags,
+        },
+        instagram_variant={
+            "formatted_text": plan.instagram.formatted_text,
+            "caption": plan.instagram.caption,
+            "call_to_action": plan.instagram.call_to_action,
+            "hashtags": plan.instagram.hashtags,
+            "media_guidance": plan.instagram.media_guidance,
+        },
+        media=final_media.model_dump() if final_media else None,
+        metadata_info={
+            "source": "voice",
+            "audio_filename": audio.filename,
+            "audio_size_bytes": len(audio_bytes),
+            "audio_mime_type": mime_type,
+            "instructions": instructions.strip() if instructions else None,
+            "intent_summary": plan.intent_summary,
+            "rationale": plan.rationale,
+            "suggested_media_prompt": plan.suggested_media_prompt,
+        },
+    )
+
+    await uow.posts.create(new_post)
+    await uow.commit()
+
+    return VoicePostGenerationResponse(
+        post_id=str(new_post.id),
+        transcription=transcription,
         plan=plan,
         media=final_media,
         status=PostStatus.DRAFT,

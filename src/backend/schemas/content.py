@@ -90,3 +90,11 @@ class ContentGenerationResponse(BaseModel):
     plan: GeneratedContentPlan
     media: Optional[MediaAsset] = None
     status: PostStatus
+
+
+class VoicePostGenerationResponse(BaseModel):
+    post_id: str
+    transcription: str = Field(description="Clean transcribed speech from the recorded voice memo")
+    plan: GeneratedContentPlan
+    media: Optional[MediaAsset] = None
+    status: PostStatus

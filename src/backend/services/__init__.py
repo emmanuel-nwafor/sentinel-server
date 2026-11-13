@@ -10,6 +10,15 @@ from backend.services.oauth_login_service import (
     OAuthLoginService,
     oauth_login_service,
 )
+from backend.services.voice_service import (
+    IVoiceTranscriber,
+    GeminiVoiceTranscriber,
+    FallbackVoiceTranscriber,
+    VoiceTranscriberFactory,
+    VoiceTranscriptionError,
+    SUPPORTED_AUDIO_MIMES,
+    MAX_AUDIO_SIZE_BYTES,
+)
 
 __all__ = [
     "IEmailService",
@@ -20,4 +29,11 @@ __all__ = [
     "GoogleOAuthClient",
     "OAuthLoginService",
     "oauth_login_service",
+    "IVoiceTranscriber",
+    "GeminiVoiceTranscriber",
+    "FallbackVoiceTranscriber",
+    "VoiceTranscriberFactory",
+    "VoiceTranscriptionError",
+    "SUPPORTED_AUDIO_MIMES",
+    "MAX_AUDIO_SIZE_BYTES",
 ]

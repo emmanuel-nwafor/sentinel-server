@@ -77,5 +77,5 @@ $env:PYTHONPATH="src"
 | **Auth & OTP** | `POST /auth/register`, `POST /auth/verify-otp`, `POST /auth/resend-otp`, `POST /auth/login`, `GET /auth/me` | Signup with 6-digit email OTP verification before JWT issuance |
 | **Social Login** | `GET /auth/oauth/{provider}`, `POST /auth/oauth/{provider}/callback`, `POST /auth/oauth/{provider}/sandbox` | Continue with Google / LinkedIn / X (auto-connects LinkedIn & X publishing) |
 | **Social Connections** | `GET /social/accounts`, `GET /social/connect/{platform}`, `GET/POST /social/callback/{platform}`, `POST /social/connect/{platform}/sandbox`, `DELETE /social/accounts/{platform}` | Connect & manage in-app publishing accounts |
-| **Posts & AI** | `POST /posts/generate`, `GET /posts`, `GET /posts/{post_id}`, `PUT /posts/{post_id}`, `POST /posts/{post_id}/schedule` | Generate LinkedIn, X, and Instagram copy & publish server-side |
+| **Posts & AI** | `POST /posts/generate`, `POST /posts/voice-draft`, `GET /posts`, `GET /posts/{post_id}`, `PUT /posts/{post_id}`, `POST /posts/{post_id}/schedule` | Text & Voice-to-Post generation for LinkedIn, X, and Instagram + server-side publishing |
 | **Media** | `POST /media/upload-signature` | Generate direct upload signatures for Cloudinary / MUX |
