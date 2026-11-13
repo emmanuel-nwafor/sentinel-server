@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td align="left" style="padding-bottom: 12px;">
+      <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #fef2f2; color: #dc2626; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        New Customer Message
+      </span>
+      <h1 class="title-text" style="margin: 12px 0 6px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; line-height: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ customer_name | default("A customer") }} sent you a message on {{ platform | default("Instagram") }}
+      </h1>
+      <p style="margin: 0; font-size: 14px; line-height: 22px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Hi {{ user_name }}, an incoming inquiry is waiting in your Dispatch Inbox.
+      </p>
+    </td>
+  </tr>
+
+  <!-- Customer Message Preview Card -->
+  <tr>
+    <td align="left" style="padding: 16px 0 24px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <tr>
+          <td style="padding: 20px;">
+            <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              {{ customer_name | default("Customer") }} ({{ customer_handle | default("@customer") }}):
+            </p>
+            <p style="margin: 0; font-size: 14px; line-height: 22px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              "{{ message_preview | default('Hello, do you have size 42 in stock and what is your express delivery timeframe?') }}"
+            </p>
+
+            {% if suggested_reply %}
+            <div style="margin-top: 14px; padding-top: 14px; border-top: 1px dashed #cbd5e1;">
+              <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #2563eb; letter-spacing: 0.5px;">
+                🤖 AI Co-Pilot Suggested Reply:
+              </span>
+              <p style="margin: 4px 0 0 0; font-size: 13px; line-height: 20px; color: #1e40af; font-style: italic;">
+                "{{ suggested_reply }}"
+              </p>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Action CTA -->
+  <tr>
+    <td align="center" style="padding-bottom: 20px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+        <tr>
+          <td align="center" bgcolor="#2563eb" style="border-radius: 8px; background-color: #2563eb;">
+            <a href="{{ conversation_url | default('https://dispatch.io/inbox') }}" class="responsive-button" style="display: inline-block; padding: 14px 36px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+              Open in Dispatch Inbox &rarr;
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td align="left" style="padding-bottom: 12px;">
+      <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #ecfdf5; color: #059669; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Post Published Successfully
+      </span>
+      <h1 class="title-text" style="margin: 12px 0 6px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; line-height: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Your post is now live on {{ platform_name }}! 🚀
+      </h1>
+      <p style="margin: 0; font-size: 14px; line-height: 22px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Hi {{ user_name }}, your scheduled post was successfully published via Dispatch.
+      </p>
+    </td>
+  </tr>
+
+  <!-- Content Snippet Card -->
+  <tr>
+    <td align="left" style="padding: 16px 0 24px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <tr>
+          <td style="padding: 20px;">
+            <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              Published Caption Preview:
+            </p>
+            <p style="margin: 0; font-size: 14px; line-height: 22px; color: #1e293b; font-style: italic; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              "{{ post_excerpt | default('Excited to announce our newest update...') }}"
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Action CTA -->
+  <tr>
+    <td align="center" style="padding-bottom: 20px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+        <tr>
+          <td align="center" bgcolor="#09090b" style="border-radius: 8px; background-color: #09090b;">
+            <a href="{{ post_url | default('https://dispatch.io/posts') }}" class="responsive-button" style="display: inline-block; padding: 14px 36px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+              View Live Post &rarr;
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+{% endblock %}

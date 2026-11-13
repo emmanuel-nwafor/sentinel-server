@@ -1,105 +1,152 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <title>{{ subject | default("Dispatch Notification") }}</title>
-  <style>
+  <!--[if mso]>
+  <style type="text/css">
+    body, table, td { font-family: Arial, Helvetica, sans-serif !important; }
+  </style>
+  <![endif]-->
+  <style type="text/css">
+    /* Global Resets */
     body {
-      margin: 0;
-      padding: 0;
-      background-color: #f8fafc;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      -webkit-text-size-adjust: 100% !important;
+      -ms-text-size-adjust: 100% !important;
+      background-color: #f1f5f9;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      color: #1e293b;
-      -webkit-font-smoothing: antialiased;
     }
-    .wrapper {
-      width: 100%;
-      background-color: #f8fafc;
-      padding: 40px 16px;
+    table {
+      border-collapse: collapse !important;
+      mso-table-lspace: 0pt !important;
+      mso-table-rspace: 0pt !important;
     }
-    .container {
-      max-width: 540px;
-      margin: 0 auto;
-      background-color: #ffffff;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    img {
+      border: 0 !important;
+      outline: none !important;
+      text-decoration: none !important;
+      -ms-interpolation-mode: bicubic !important;
+      max-width: 100% !important;
     }
-    .header {
-      padding: 32px 32px 24px 32px;
-      border-bottom: 1px solid #f1f5f9;
-      background: #09090b;
-      text-align: left;
-    }
-    .brand {
-      display: inline-block;
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      color: #ffffff;
+    a {
       text-decoration: none;
     }
-    .brand-dot {
-      color: #3b82f6;
-    }
-    .brand-badge {
-      display: inline-block;
-      margin-left: 8px;
-      padding: 2px 8px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-radius: 9999px;
-      background-color: rgba(59, 130, 246, 0.2);
-      color: #60a5fa;
-    }
-    .content {
-      padding: 32px;
-    }
-    .footer {
-      padding: 24px 32px;
-      background-color: #f8fafc;
-      border-top: 1px solid #f1f5f9;
-      font-size: 12px;
-      color: #64748b;
-      line-height: 1.6;
-      text-align: center;
-    }
-    .footer a {
-      color: #3b82f6;
-      text-decoration: none;
-    }
-    .footer a:hover {
-      text-decoration: underline;
+
+    /* Mobile Responsive Breakpoint */
+    @media only screen and (max-width: 600px) {
+      .email-wrapper {
+        padding: 8px !important;
+      }
+      .email-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 12px !important;
+      }
+      .header-padding {
+        padding: 20px 20px !important;
+      }
+      .content-padding {
+        padding: 24px 20px !important;
+      }
+      .footer-padding {
+        padding: 20px 20px !important;
+      }
+      .otp-display {
+        font-size: 30px !important;
+        letter-spacing: 6px !important;
+        padding: 16px 8px !important;
+      }
+      .responsive-button {
+        display: block !important;
+        width: 100% !important;
+        text-align: center !important;
+        padding: 14px 16px !important;
+        box-sizing: border-box !important;
+      }
+      .metric-col {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 12px !important;
+      }
+      .title-text {
+        font-size: 22px !important;
+        line-height: 28px !important;
+      }
     }
   </style>
 </head>
-<body>
-  <div class="wrapper">
-    <div class="container">
-      <div class="header">
-        <a href="https://dispatch.io" class="brand">
-          Dispatch<span class="brand-dot">.</span>io
-        </a>
-        <span class="brand-badge">Platform</span>
-      </div>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; -webkit-font-smoothing: antialiased;">
+  <!-- Outer Full-Width Wrapper Table -->
+  <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#f1f5f9" class="email-wrapper" style="background-color: #f1f5f9; padding: 32px 12px;">
+    <tr>
+      <td align="center" valign="top">
 
-      <div class="content">
-        {% block content %}{% endblock %}
-      </div>
+        <!--[if (gte mso 9)|(IE)]>
+        <table align="center" border="0" cellspacing="0" cellpadding="0" width="600">
+        <tr>
+        <td align="center" valign="top" width="600">
+        <![endif]-->
 
-      <div class="footer">
-        <p style="margin: 0 0 8px 0;">
-          Sent with care by <strong>Dispatch Operations</strong> &bull; dispatch.io
-        </p>
-        <p style="margin: 0;">
-          Questions? Reply directly to this email or visit our <a href="https://dispatch.io/support">Help Center</a>.
-        </p>
-      </div>
-    </div>
-  </div>
+        <!-- Central Card Container Table (Max 600px) -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="email-card" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+
+          <!-- Brand Header -->
+          <tr>
+            <td align="left" bgcolor="#09090b" class="header-padding" style="background-color: #09090b; padding: 24px 32px; border-bottom: 1px solid #1e293b;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="left" valign="middle">
+                    <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      Dispatch<span style="color: #3b82f6;">.</span>io
+                    </span>
+                    <span style="display: inline-block; margin-left: 10px; padding: 3px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border-radius: 9999px; background-color: rgba(59, 130, 246, 0.2); color: #60a5fa; vertical-align: middle;">
+                      {{ header_badge | default("Platform") }}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Dynamic Email Content Block -->
+          <tr>
+            <td align="left" class="content-padding" style="padding: 36px 32px; background-color: #ffffff;">
+              {% block content %}{% endblock %}
+            </td>
+          </tr>
+
+          <!-- Unified Professional Footer -->
+          <tr>
+            <td align="center" bgcolor="#f8fafc" class="footer-padding" style="background-color: #f8fafc; padding: 24px 32px; border-top: 1px solid #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              <p style="margin: 0 0 8px 0; font-size: 12px; line-height: 18px; color: #64748b; text-align: center;">
+                Sent with care by <strong>Dispatch AI Operations Platform</strong> &bull; <a href="https://dispatch.io" style="color: #3b82f6; text-decoration: none;">dispatch.io</a>
+              </p>
+              <p style="margin: 0; font-size: 11px; line-height: 16px; color: #94a3b8; text-align: center;">
+                If you have questions, reply directly to this email or visit our <a href="https://dispatch.io/help" style="color: #64748b; text-decoration: underline;">Support Center</a>.<br />
+                &copy; {{ current_year | default("2026") }} Dispatch Technologies Inc. All rights reserved.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- End Central Card Container -->
+
+        <!--[if (gte mso 9)|(IE)]>
+        </td>
+        </tr>
+        </table>
+        <![endif]-->
+
+      </td>
+    </tr>
+  </table>
+  <!-- End Outer Table -->
 </body>
 </html>

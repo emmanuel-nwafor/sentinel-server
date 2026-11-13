@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <!-- Category Badge -->
+  <tr>
+    <td align="left" style="padding-bottom: 12px;">
+      <span style="display: inline-block; padding: 4px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #ede9fe; color: #7c3aed; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ campaign_tag | default("Product Announcement") }}
+      </span>
+    </td>
+  </tr>
+
+  <!-- Main Headline -->
+  <tr>
+    <td align="left" style="padding-bottom: 16px;">
+      <h1 class="title-text" style="margin: 0; font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; line-height: 34px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ headline | default("Supercharge your social presence with AI automation") }}
+      </h1>
+    </td>
+  </tr>
+
+  <!-- Hero Image (Optional) -->
+  {% if hero_image_url %}
+  <tr>
+    <td align="center" style="padding-bottom: 24px;">
+      <img src="{{ hero_image_url }}" alt="Announcement Visual" width="536" style="width: 100%; max-width: 536px; height: auto; border-radius: 12px; border: 1px solid #e2e8f0; display: block;" />
+    </td>
+  </tr>
+  {% endif %}
+
+  <!-- Body Content -->
+  <tr>
+    <td align="left" style="padding-bottom: 24px;">
+      <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 24px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Hi {{ user_name }},
+      </p>
+      <div style="font-size: 15px; line-height: 24px; color: #475569; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ announcement_body | default("We are excited to introduce new capabilities in Dispatch! You can now manage your entire social media workflow—from recording 30-second voice memos to automated publishing across LinkedIn, X, and Instagram—all without leaving your phone.") }}
+      </div>
+    </td>
+  </tr>
+
+  <!-- Feature Highlights / Benefits -->
+  {% if bullet_points %}
+  <tr>
+    <td align="left" style="padding-bottom: 24px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <tr>
+          <td style="padding: 20px;">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+              {% for point in bullet_points %}
+              <tr>
+                <td valign="top" style="width: 24px; padding-bottom: 10px; font-size: 16px;">✨</td>
+                <td valign="top" style="padding-bottom: 10px; font-size: 14px; line-height: 22px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  {{ point }}
+                </td>
+              </tr>
+              {% endfor %}
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  {% endif %}
+
+  <!-- Call To Action Button -->
+  <tr>
+    <td align="center" style="padding: 8px 0 24px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+        <tr>
+          <td align="center" bgcolor="#2563eb" style="border-radius: 8px; background-color: #2563eb;">
+            <a href="{{ cta_url | default('https://dispatch.io') }}" class="responsive-button" style="display: inline-block; padding: 14px 36px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+              {{ cta_text | default("Explore What's New &rarr;") }}
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Unsubscribe / Marketing Preferences -->
+  <tr>
+    <td align="center" style="border-top: 1px dashed #e2e8f0; padding-top: 20px;">
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        You received this email because you are a registered user of Dispatch.io.<br />
+        <a href="{{ unsubscribe_url | default('https://dispatch.io/settings/notifications') }}" style="color: #64748b; text-decoration: underline;">Manage email preferences</a> or <a href="{{ unsubscribe_url | default('https://dispatch.io/unsubscribe') }}" style="color: #64748b; text-decoration: underline;">unsubscribe</a> at any time.
+      </p>
+    </td>
+  </tr>
+</table>
+{% endblock %}
