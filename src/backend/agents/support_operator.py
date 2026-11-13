@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class SupportOperatorAgent:
     """
-    Sentinel AI Support Co-Pilot:
+    Dispatch AI Support Co-Pilot:
     Analyzes incoming customer DMs/comments across Instagram, X, and LinkedIn,
     detects intent (sizing, shipping, pricing, product availability),
     and synthesizes high-converting, empathetic customer service replies.
@@ -55,7 +55,7 @@ class SupportOperatorAgent:
         store_context: str,
     ) -> SupportReplySuggestionResponse:
         system_instruction = f"""
-        You are Sentinel's AI Customer Support Co-Pilot for modern businesses and creators.
+        You are Dispatch's AI Customer Support Co-Pilot for modern businesses and creators.
         Your goal is to help the business owner respond to customer DMs and comments promptly, warmly, and helpfully.
 
         Store Context: {store_context}

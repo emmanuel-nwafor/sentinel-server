@@ -14,7 +14,7 @@ from backend.schemas.content import (
 
 class ContentOperatorAgent:
     """
-    Sentinel Content Operator Agent:
+    Dispatch Content Operator Agent:
     Transforms natural language intents into platform-native posts for LinkedIn, X, and Instagram
     using Gemini 2.5 Flash with strict Pydantic JSON schema extraction.
     """
@@ -30,7 +30,7 @@ class ContentOperatorAgent:
 
     async def _generate_with_llm(self, request: ContentGenerationRequest) -> GeneratedContentPlan:
         system_instruction = """
-        You are the Sentinel Content Operator Agent for modern AI-driven businesses.
+        You are the Dispatch Content Operator Agent for modern AI-driven businesses.
         Your mission is to take user prompts and elevate them into high-performing,
         platform-native social posts.
 

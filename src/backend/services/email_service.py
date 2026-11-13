@@ -77,7 +77,7 @@ class BrevoEmailService(IEmailService):
 
     BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
-    def __init__(self, api_key: str, sender_email: str, sender_name: str = "Sentinel"):
+    def __init__(self, api_key: str, sender_email: str, sender_name: str = "Dispatch"):
         self._api_key = api_key
         self._sender_email = sender_email
         self._sender_name = sender_name
@@ -85,9 +85,9 @@ class BrevoEmailService(IEmailService):
     async def send_otp_email(self, to_email: str, user_name: str, otp_code: str) -> None:
         html_content = (
             f"<div style='font-family:sans-serif;max-width:500px;margin:auto;padding:24px;border:1px solid #eaeaea;border-radius:12px;'>"
-            f"<h2 style='color:#111;'>Sentinel Verification</h2>"
+            f"<h2 style='color:#111;'>Dispatch Verification</h2>"
             f"<p style='color:#555;'>Hi {user_name},</p>"
-            f"<p style='color:#555;'>Your 6-digit Sentinel verification code is:</p>"
+            f"<p style='color:#555;'>Your 6-digit Dispatch verification code is:</p>"
             f"<div style='background:#f4f4f5;padding:16px;text-align:center;font-size:28px;font-weight:bold;letter-spacing:6px;border-radius:8px;color:#09090b;margin:20px 0;'>"
             f"{otp_code}"
             f"</div>"
@@ -98,7 +98,7 @@ class BrevoEmailService(IEmailService):
         payload = {
             "sender": {"name": self._sender_name, "email": self._sender_email},
             "to": [{"email": to_email, "name": user_name}],
-            "subject": f"{otp_code} is your Sentinel verification code",
+            "subject": f"{otp_code} is your Dispatch verification code",
             "htmlContent": html_content,
         }
 
@@ -121,10 +121,11 @@ class BrevoEmailService(IEmailService):
 def get_email_service() -> IEmailService:
     """Factory returning Brevo or Resend in production, or ConsoleEmailService in dev."""
     if settings.BREVO_API_KEY:
-        sender = settings.BREVO_SENDER_EMAIL or "noreply@sentinel.app"
+        sender = settings.BREVO_SENDER_EMAIL or "noreply@dispatch.io"
         return BrevoEmailService(
             api_key=settings.BREVO_API_KEY,
             sender_email=sender,
+            sender_name="Dispatch",
         )
     if settings.RESEND_API_KEY:
         return ResendEmailService(

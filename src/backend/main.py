@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Sentinel AI Operations Platform - Unified Python Backend (PostgreSQL + Async SQLAlchemy 2.0)",
+    description="Dispatch AI Operations Platform - Unified Python Backend (PostgreSQL + Async SQLAlchemy 2.0)",
     lifespan=lifespan,
 )
 

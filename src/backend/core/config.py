@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Sentinel Unified AI Backend"
+    PROJECT_NAME: str = "Dispatch AI Operations Platform"
     VERSION: str = "0.3.0"
     ENVIRONMENT: str = "development"
     PORT: int = 8000
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     BREVO_API_KEY: str = ""
     BREVO_SENDER_EMAIL: str = ""
-    EMAIL_FROM: str = "Sentinel <noreply@sentinel.app>"
+    EMAIL_FROM: str = "Dispatch <noreply@dispatch.io>"
     OTP_EXPIRE_MINUTES: int = 10
     OTP_RESEND_COOLDOWN_SECONDS: int = 60
     OTP_MAX_ATTEMPTS: int = 5

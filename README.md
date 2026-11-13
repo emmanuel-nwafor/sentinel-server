@@ -1,6 +1,6 @@
-# Sentinel Backend API
+# Dispatch Backend API
 
-Unified Python backend for **Sentinel** — a mobile-first **AI Business Operations Platform** starting with Content Operations, Email + OTP Authentication, Social OAuth Login & Auto-Connect, and 100% server-side social publishing (**LinkedIn**, **X**, and **Instagram**).
+Unified Python backend for **Dispatch** (`dispatch.io`) — a mobile-first **AI Business Operations Platform** featuring Content Operations, Unified Inbox & AI Customer Support, Email + OTP Authentication, Social OAuth Login & Auto-Connect, and 100% server-side social publishing (**LinkedIn**, **X**, and **Instagram**).
 
 ---
 
