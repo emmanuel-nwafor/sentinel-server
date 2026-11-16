@@ -1,8 +1,94 @@
 import time
+import uuid
 import hashlib
+import logging
 from typing import Dict, Any, Optional
+import boto3
+from botocore.config import Config
 from backend.core.config import settings
 from backend.schemas.content import MediaAsset
+
+logger = logging.getLogger(__name__)
+
+
+class CloudflareR2Tool:
+    """
+    Cloudflare R2 Object Storage Tool.
+    Generates secure S3 pre-signed upload URLs for direct client-to-R2 uploads (zero server bandwidth).
+    """
+
+    def __init__(self):
+        self.account_id = settings.CLOUDFLARE_R2_ACCOUNT_ID
+        self.access_key_id = settings.CLOUDFLARE_R2_ACCESS_KEY_ID
+        self.secret_access_key = settings.CLOUDFLARE_R2_SECRET_ACCESS_KEY
+        self.bucket_name = settings.CLOUDFLARE_R2_BUCKET_NAME
+        self.public_url = settings.CLOUDFLARE_R2_PUBLIC_URL.rstrip("/") if settings.CLOUDFLARE_R2_PUBLIC_URL else ""
+
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.account_id and self.access_key_id and self.secret_access_key)
+
+    def _get_s3_client(self):
+        return boto3.client(
+            "s3",
+            endpoint_url=f"https://{self.account_id}.r2.cloudflarestorage.com",
+            aws_access_key_id=self.access_key_id,
+            aws_secret_access_key=self.secret_access_key,
+            config=Config(signature_version="s3v4"),
+            region_name="auto",
+        )
+
+    def generate_presigned_upload_url(
+        self,
+        media_type: str,
+        filename: Optional[str] = None,
+        content_type: Optional[str] = None,
+        expires_in: int = 900,
+    ) -> Dict[str, Any]:
+        """
+        Create a 15-minute pre-signed S3 PUT URL for direct mobile/web upload to Cloudflare R2.
+        """
+        ext = filename.split(".")[-1] if filename and "." in filename else ("mp4" if media_type == "video" else "jpg")
+        folder = "videos" if media_type == "video" else "images"
+        file_key = f"{folder}/{uuid.uuid4().hex}.{ext}"
+        mime_type = content_type or ("video/mp4" if media_type == "video" else "image/jpeg")
+
+        if not self.is_configured:
+            # Development fallback when keys are not yet pasted into .env
+            public_base = self.public_url or "https://pub-dispatch.r2.dev"
+            return {
+                "provider": "r2",
+                "upload_url": f"https://mock-r2.dispatch.io/{file_key}",
+                "method": "PUT",
+                "public_url": f"{public_base}/{file_key}",
+                "file_key": file_key,
+                "content_type": mime_type,
+                "expires_in": expires_in,
+                "is_sandbox": True,
+            }
+
+        s3 = self._get_s3_client()
+        presigned_url = s3.generate_presigned_url(
+            ClientMethod="put_object",
+            Params={
+                "Bucket": self.bucket_name,
+                "Key": file_key,
+                "ContentType": mime_type,
+            },
+            ExpiresIn=expires_in,
+        )
+
+        public_base = self.public_url or f"https://{self.bucket_name}.{self.account_id}.r2.cloudflarestorage.com"
+        return {
+            "provider": "r2",
+            "upload_url": presigned_url,
+            "method": "PUT",
+            "public_url": f"{public_base}/{file_key}",
+            "file_key": file_key,
+            "content_type": mime_type,
+            "expires_in": expires_in,
+            "is_sandbox": False,
+        }
 
 
 class CloudinaryTool:

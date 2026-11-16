@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
 
+    # Monetization & Premium Feature Flags
+    # By default, enforcement is disabled (False) so all users have unrestricted access in dev/early-stage
+    ENABLE_PREMIUM_ENFORCEMENT: bool = False
+    DEFAULT_FREE_AI_QUOTA: int = 50
+    PRO_TIER_MONTHLY_PRICE: float = 29.0
+    ENTERPRISE_TIER_MONTHLY_PRICE: float = 99.0
+
     # Redis & Task Queue
     REDIS_URL: str = "redis://localhost:6379"
 
@@ -42,6 +49,13 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str = "sentinel_cloudinary_secret_key"
     MUX_TOKEN_ID: str = "sentinel_mux_token_id"
     MUX_TOKEN_SECRET: str = "sentinel_mux_token_secret"
+
+    # Cloudflare R2 Object Storage (Zero-egress S3-compatible media engine)
+    CLOUDFLARE_R2_ACCOUNT_ID: str = ""
+    CLOUDFLARE_R2_ACCESS_KEY_ID: str = ""
+    CLOUDFLARE_R2_SECRET_ACCESS_KEY: str = ""
+    CLOUDFLARE_R2_BUCKET_NAME: str = "dispatch-media"
+    CLOUDFLARE_R2_PUBLIC_URL: str = ""
 
     # Social Login & Publishing OAuth App Credentials (app-level keys, not user tokens)
     GOOGLE_CLIENT_ID: str = ""
