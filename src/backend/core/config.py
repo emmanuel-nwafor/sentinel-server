@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str = "sentinel_cloudinary_secret_key"
     MUX_TOKEN_ID: str = "sentinel_mux_token_id"
     MUX_TOKEN_SECRET: str = "sentinel_mux_token_secret"
+    MUX_SIGNING_KEY: str = ""
 
     # Cloudflare R2 Object Storage (Zero-egress S3-compatible media engine)
     CLOUDFLARE_R2_ACCOUNT_ID: str = ""
