@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block content %}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <!-- Security Tag -->
+  <tr>
+    <td align="left" style="padding-bottom: 12px;">
+      <span style="display: inline-block; padding: 4px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Security Notification
+      </span>
+    </td>
+  </tr>
+
+  <!-- Main Headline -->
+  <tr>
+    <td align="left" style="padding-bottom: 16px;">
+      <h1 class="title-text" style="margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; line-height: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ alert_title | default("New sign-in detected on your account") }}
+      </h1>
+      <p style="margin: 12px 0 0 0; font-size: 15px; line-height: 24px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Hi <strong>{{ user_name }}</strong>,
+      </p>
+      <p style="margin: 8px 0 0 0; font-size: 15px; line-height: 24px; color: #475569; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ alert_description | default("We noticed a new session sign-in to your Sentinel account with the following details:") }}
+      </p>
+    </td>
+  </tr>
+
+  <!-- Session Metadata Details Card -->
+  <tr>
+    <td align="left" style="padding: 12px 0 24px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <tr>
+          <td style="padding: 18px 20px;">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td style="font-size: 13px; line-height: 22px; color: #64748b; width: 35%;">Time:</td>
+                <td style="font-size: 13px; line-height: 22px; color: #0f172a; font-weight: 600;">{{ event_time | default("Just now (UTC)") }}</td>
+              </tr>
+              <tr>
+                <td style="font-size: 13px; line-height: 22px; color: #64748b;">Device / Browser:</td>
+                <td style="font-size: 13px; line-height: 22px; color: #0f172a; font-weight: 600;">{{ device_info | default("Chrome on macOS") }}</td>
+              </tr>
+              <tr>
+                <td style="font-size: 13px; line-height: 22px; color: #64748b;">Approximate Location:</td>
+                <td style="font-size: 13px; line-height: 22px; color: #0f172a; font-weight: 600;">{{ location_info | default("San Francisco, CA, USA") }}</td>
+              </tr>
+              <tr>
+                <td style="font-size: 13px; line-height: 22px; color: #64748b;">IP Address:</td>
+                <td style="font-size: 13px; line-height: 22px; color: #0f172a; font-weight: 600; font-family: 'Courier New', monospace;">{{ ip_address | default("192.0.2.1") }}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- If You Recognized / Didn't Recognize Notice -->
+  <tr>
+    <td align="left" style="padding-bottom: 24px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px;">
+        <tr>
+          <td style="padding: 14px 18px; font-size: 13px; line-height: 20px; color: #991b1b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            🚨 <strong>Don't recognize this activity?</strong> Your account may be compromised. Click below to invalidate all active tokens and reset your password immediately.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Lock & Secure CTA -->
+  <tr>
+    <td align="center" style="padding: 4px 0 24px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+        <tr>
+          <td align="center" bgcolor="#dc2626" style="border-radius: 8px; background-color: #dc2626;">
+            <a href="{{ lock_account_url | default('https://sentinel.ai/security/sessions') }}" class="responsive-button" style="display: inline-block; padding: 14px 38px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+              Secure My Account Now &rarr;
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Footnote -->
+  <tr>
+    <td align="left" style="border-top: 1px dashed #e2e8f0; padding-top: 18px;">
+      <p style="margin: 0; font-size: 12px; line-height: 18px; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        If this was you, you can safely disregard this notice. No action is required.
+      </p>
+    </td>
+  </tr>
+</table>
+{% endblock %}

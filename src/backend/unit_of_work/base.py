@@ -8,6 +8,7 @@ from backend.repositories.oauth_identity_repository import IOAuthIdentityReposit
 from backend.repositories.customer_repository import ICustomerRepository
 from backend.repositories.conversation_repository import IConversationRepository
 from backend.repositories.message_repository import IMessageRepository
+from backend.repositories.brand_voice_repository import IBrandVoiceRepository
 
 
 class IUnitOfWork(ABC):
@@ -24,6 +25,7 @@ class IUnitOfWork(ABC):
     customers: ICustomerRepository
     conversations: IConversationRepository
     messages: IMessageRepository
+    brand_voices: IBrandVoiceRepository
 
     @abstractmethod
     async def __aenter__(self) -> Self:

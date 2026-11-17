@@ -120,3 +120,39 @@ class SocialPublishingService:
             final_status = PostStatus.FAILED
 
         return final_status, results
+
+    async def delete_published_post(
+        self,
+        uow: IUnitOfWork,
+        user_id: uuid.UUID,
+        post: PostModel,
+    ) -> Dict[str, bool]:
+        """
+        Delete remote posts across connected social accounts if post was published.
+        Returns map of platform -> success boolean.
+        """
+        results: Dict[str, bool] = {}
+        publish_results = post.publish_results or {}
+
+        for plat_str, res in publish_results.items():
+            if not isinstance(res, dict) or not res.get("remote_post_id"):
+                continue
+            remote_id = res["remote_post_id"]
+            try:
+                platform = SocialPlatform(plat_str)
+                account = await uow.social_accounts.get_by_user_and_platform(user_id, platform.value)
+                if account and account.is_active:
+                    access_token = self._cipher.decrypt(account.encrypted_access_token)
+                    publisher = PublisherFactory.get_publisher(platform)
+                    success = await publisher.delete_post(
+                        account=account,
+                        access_token=access_token,
+                        remote_post_id=remote_id,
+                    )
+                    results[plat_str] = success
+                else:
+                    results[plat_str] = True
+            except Exception:
+                results[plat_str] = False
+
+        return results

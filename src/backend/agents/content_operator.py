@@ -23,14 +23,22 @@ class ContentOperatorAgent:
         api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
         self.client = genai.Client(api_key=api_key) if api_key else None
 
-    async def execute(self, request: ContentGenerationRequest) -> GeneratedContentPlan:
+    async def execute(
+        self,
+        request: ContentGenerationRequest,
+        brand_voice_prompt: str = None,
+    ) -> GeneratedContentPlan:
         if self.client:
-            return await self._generate_with_llm(request)
+            return await self._generate_with_llm(request, brand_voice_prompt)
         return self._generate_deterministic_fallback(request)
 
-    async def _generate_with_llm(self, request: ContentGenerationRequest) -> GeneratedContentPlan:
+    async def _generate_with_llm(
+        self,
+        request: ContentGenerationRequest,
+        brand_voice_prompt: str = None,
+    ) -> GeneratedContentPlan:
         system_instruction = """
-        You are the Dispatch Content Operator Agent for modern AI-driven businesses.
+        You are the Sentinel Content Operator Agent for modern AI-driven businesses.
         Your mission is to take user prompts and elevate them into high-performing,
         platform-native social posts.
 
@@ -57,7 +65,14 @@ class ContentOperatorAgent:
            - Synthesize a photorealistic, modern visual prompt suitable for generating an image banner.
         """
 
-        prompt = f"User Intent: {request.prompt}\nWorkspace: {request.workspace.value}"
+        prompt_parts = [
+            f"User Intent: {request.prompt}",
+            f"Workspace: {request.workspace.value}",
+        ]
+        if brand_voice_prompt:
+            prompt_parts.append(f"\n[Custom Brand Voice Persona Instructions]:\n{brand_voice_prompt}")
+
+        prompt = "\n".join(prompt_parts)
 
         response = self.client.models.generate_content(
             model="gemini-2.5-flash",

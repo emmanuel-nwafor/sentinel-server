@@ -64,9 +64,27 @@ class ISocialPublisher(ABC):
     ) -> PlatformPublishResult:
         pass
 
+    @abstractmethod
+    async def delete_post(
+        self,
+        account: SocialAccountModel,
+        access_token: str,
+        remote_post_id: str,
+    ) -> bool:
+        pass
+
 
 class BaseSocialPublisher(ISocialPublisher, ABC):
     """Shared utilities for HTTP streaming, validation, and sandbox publishing."""
+
+    async def delete_post(
+        self,
+        account: SocialAccountModel,
+        access_token: str,
+        remote_post_id: str,
+    ) -> bool:
+        """Default sandbox / base post deletion handler."""
+        return True
 
     async def _download_media_bytes(self, url: str) -> Tuple[bytes, str]:
         """Download binary asset from Cloudinary or MUX URL for server-side upload."""

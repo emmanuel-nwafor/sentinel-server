@@ -176,3 +176,22 @@ class InstagramPublisher(BaseSocialPublisher):
                 is_sandbox=False,
                 published_at=datetime.now(timezone.utc),
             )
+
+    async def delete_post(
+        self,
+        account: SocialAccountModel,
+        access_token: str,
+        remote_post_id: str,
+    ) -> bool:
+        """
+        Delete media via Instagram Graph API DELETE /{ig-media-id}
+        """
+        if account.is_sandbox:
+            return True
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.delete(
+                f"{self._graph_base}/{remote_post_id}",
+                params={"access_token": access_token},
+            )
+            return resp.status_code in (200, 204)

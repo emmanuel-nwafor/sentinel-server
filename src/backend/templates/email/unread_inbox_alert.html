@@ -2,61 +2,94 @@
 
 {% block content %}
 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <!-- Alert Category Badge -->
   <tr>
     <td align="left" style="padding-bottom: 12px;">
-      <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #fef2f2; color: #dc2626; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        New Customer Message
+      <span style="display: inline-block; padding: 4px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Priority Customer Inquiry
       </span>
-      <h1 class="title-text" style="margin: 12px 0 6px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; line-height: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        {{ customer_name | default("A customer") }} sent you a message on {{ platform | default("Instagram") }}
+    </td>
+  </tr>
+
+  <!-- Header -->
+  <tr>
+    <td align="left" style="padding-bottom: 16px;">
+      <h1 class="title-text" style="margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; line-height: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        New inquiry from {{ customer_name | default("Customer") }} on {{ platform | default("Instagram") }}
       </h1>
-      <p style="margin: 0; font-size: 14px; line-height: 22px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        Hi {{ user_name }}, an incoming inquiry is waiting in your Dispatch Inbox.
+      <p style="margin: 10px 0 0 0; font-size: 15px; line-height: 24px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Hi {{ user_name }}, an incoming customer conversation requires your attention in the {{ brand_name | default("Sentinel") }} Inbox.
       </p>
     </td>
   </tr>
 
-  <!-- Customer Message Preview Card -->
+  <!-- Customer Inquiry Preview Card -->
   <tr>
-    <td align="left" style="padding: 16px 0 24px 0;">
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+    <td align="left" style="padding: 12px 0 24px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px;">
         <tr>
-          <td style="padding: 20px;">
-            <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              {{ customer_name | default("Customer") }} ({{ customer_handle | default("@customer") }}):
-            </p>
-            <p style="margin: 0; font-size: 14px; line-height: 22px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              "{{ message_preview | default('Hello, do you have size 42 in stock and what is your express delivery timeframe?') }}"
-            </p>
+          <td style="padding: 22px 20px;">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td align="left" style="padding-bottom: 8px;">
+                  <span style="font-size: 14px; font-weight: 800; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    {{ customer_name | default("Customer") }}
+                  </span>
+                  <span style="font-size: 13px; color: #64748b; font-weight: 500;">
+                    ({{ customer_handle | default("@handle") }}) &bull; via {{ platform | default("Direct Message") }}
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td align="left">
+                  <div style="font-size: 14px; line-height: 22px; color: #334155; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin: 4px 0 14px 0;">
+                    "{{ message_preview | default('Hello, what are your enterprise SLA commitments and team onboarding timelines?') }}"
+                  </div>
+                </td>
+              </tr>
 
-            {% if suggested_reply %}
-            <div style="margin-top: 14px; padding-top: 14px; border-top: 1px dashed #cbd5e1;">
-              <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #2563eb; letter-spacing: 0.5px;">
-                🤖 AI Co-Pilot Suggested Reply:
-              </span>
-              <p style="margin: 4px 0 0 0; font-size: 13px; line-height: 20px; color: #1e40af; font-style: italic;">
-                "{{ suggested_reply }}"
-              </p>
-            </div>
-            {% endif %}
+              {% if suggested_reply %}
+              <tr>
+                <td align="left">
+                  <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px 16px;">
+                    <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #1d4ed8; letter-spacing: 0.6px; display: block; margin-bottom: 6px;">
+                      🤖 AI Co-Pilot Suggested Response:
+                    </span>
+                    <p style="margin: 0; font-size: 13px; line-height: 20px; color: #1e40af; font-style: italic;">
+                      "{{ suggested_reply }}"
+                    </p>
+                  </div>
+                </td>
+              </tr>
+              {% endif %}
+            </table>
           </td>
         </tr>
       </table>
     </td>
   </tr>
 
-  <!-- Action CTA -->
+  <!-- Primary Response CTA -->
   <tr>
-    <td align="center" style="padding-bottom: 20px;">
+    <td align="center" style="padding: 4px 0 24px 0;">
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
         <tr>
           <td align="center" bgcolor="#2563eb" style="border-radius: 8px; background-color: #2563eb;">
-            <a href="{{ conversation_url | default('https://dispatch.io/inbox') }}" class="responsive-button" style="display: inline-block; padding: 14px 36px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
-              Open in Dispatch Inbox &rarr;
+            <a href="{{ conversation_url | default('https://sentinel.ai/inbox') }}" class="responsive-button" style="display: inline-block; padding: 14px 38px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+              Open in Sentinel Inbox &rarr;
             </a>
           </td>
         </tr>
       </table>
+    </td>
+  </tr>
+
+  <!-- SLA & Response Time Note -->
+  <tr>
+    <td align="left" style="border-top: 1px dashed #e2e8f0; padding-top: 18px;">
+      <p style="margin: 0; font-size: 12px; line-height: 18px; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Responding within 15 minutes increases customer conversion by 3.8x. You can approve the AI suggested reply directly inside Sentinel with a single tap.
+      </p>
     </td>
   </tr>
 </table>

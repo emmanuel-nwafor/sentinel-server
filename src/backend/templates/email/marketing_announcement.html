@@ -2,11 +2,11 @@
 
 {% block content %}
 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-  <!-- Category Badge -->
+  <!-- Category Pill -->
   <tr>
     <td align="left" style="padding-bottom: 12px;">
-      <span style="display: inline-block; padding: 4px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #ede9fe; color: #7c3aed; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        {{ campaign_tag | default("Product Announcement") }}
+      <span style="display: inline-block; padding: 4px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #ede9fe; color: #7c3aed; border: 1px solid #ddd6fe; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ campaign_tag | default("Major Product Release") }}
       </span>
     </td>
   </tr>
@@ -14,8 +14,8 @@
   <!-- Main Headline -->
   <tr>
     <td align="left" style="padding-bottom: 16px;">
-      <h1 class="title-text" style="margin: 0; font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; line-height: 34px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        {{ headline | default("Supercharge your social presence with AI automation") }}
+      <h1 class="title-text" style="margin: 0; font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; line-height: 34px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ headline | default("Introducing Unified Multi-Channel AI Autopilot") }}
       </h1>
     </td>
   </tr>
@@ -24,7 +24,7 @@
   {% if hero_image_url %}
   <tr>
     <td align="center" style="padding-bottom: 24px;">
-      <img src="{{ hero_image_url }}" alt="Announcement Visual" width="536" style="width: 100%; max-width: 536px; height: auto; border-radius: 12px; border: 1px solid #e2e8f0; display: block;" />
+      <img src="{{ hero_image_url }}" alt="Announcement Visual" width="528" style="width: 100%; max-width: 528px; height: auto; border-radius: 12px; border: 1px solid #e2e8f0; display: block;" />
     </td>
   </tr>
   {% endif %}
@@ -36,23 +36,23 @@
         Hi {{ user_name }},
       </p>
       <div style="font-size: 15px; line-height: 24px; color: #475569; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        {{ announcement_body | default("We are excited to introduce new capabilities in Dispatch! You can now manage your entire social media workflow—from recording 30-second voice memos to automated publishing across LinkedIn, X, and Instagram—all without leaving your phone.") }}
+        {{ announcement_body | default("We are proud to introduce a foundational upgrade to Sentinel! You can now manage your entire social media workflow—from recording 30-second voice memos to automated server-side publishing across LinkedIn, X, and Instagram—directly from one unified command center.") }}
       </div>
     </td>
   </tr>
 
-  <!-- Feature Highlights / Benefits -->
+  <!-- Bullet Feature Highlights -->
   {% if bullet_points %}
   <tr>
-    <td align="left" style="padding-bottom: 24px;">
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+    <td align="left" style="padding-bottom: 26px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px;">
         <tr>
-          <td style="padding: 20px;">
+          <td style="padding: 22px 20px;">
             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
               {% for point in bullet_points %}
               <tr>
-                <td valign="top" style="width: 24px; padding-bottom: 10px; font-size: 16px;">✨</td>
-                <td valign="top" style="padding-bottom: 10px; font-size: 14px; line-height: 22px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                <td valign="top" style="width: 24px; padding-bottom: 12px; font-size: 16px;">⚡</td>
+                <td valign="top" style="padding-bottom: 12px; font-size: 14px; line-height: 22px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                   {{ point }}
                 </td>
               </tr>
@@ -65,14 +65,14 @@
   </tr>
   {% endif %}
 
-  <!-- Call To Action Button -->
+  <!-- Primary Call To Action Button -->
   <tr>
-    <td align="center" style="padding: 8px 0 24px 0;">
+    <td align="center" style="padding: 4px 0 26px 0;">
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
         <tr>
           <td align="center" bgcolor="#2563eb" style="border-radius: 8px; background-color: #2563eb;">
-            <a href="{{ cta_url | default('https://dispatch.io') }}" class="responsive-button" style="display: inline-block; padding: 14px 36px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
-              {{ cta_text | default("Explore What's New &rarr;") }}
+            <a href="{{ cta_url | default('https://sentinel.ai') }}" class="responsive-button" style="display: inline-block; padding: 15px 42px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+              {{ cta_text | default("Explore the New Features &rarr;") }}
             </a>
           </td>
         </tr>
@@ -80,12 +80,12 @@
     </td>
   </tr>
 
-  <!-- Unsubscribe / Marketing Preferences -->
+  <!-- Secondary Help / Footnote -->
   <tr>
     <td align="center" style="border-top: 1px dashed #e2e8f0; padding-top: 20px;">
       <p style="margin: 0; font-size: 11px; line-height: 16px; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        You received this email because you are a registered user of Dispatch.io.<br />
-        <a href="{{ unsubscribe_url | default('https://dispatch.io/settings/notifications') }}" style="color: #64748b; text-decoration: underline;">Manage email preferences</a> or <a href="{{ unsubscribe_url | default('https://dispatch.io/unsubscribe') }}" style="color: #64748b; text-decoration: underline;">unsubscribe</a> at any time.
+        You received this announcement because you are an active member of {{ brand_name | default("Sentinel") }}.<br />
+        <a href="{{ preferences_url | default('https://sentinel.ai/settings/notifications') }}" style="color: #64748b; text-decoration: underline;">Manage email preferences</a> or <a href="{{ unsubscribe_url | default('https://sentinel.ai/unsubscribe') }}" style="color: #64748b; text-decoration: underline;">unsubscribe</a> anytime.
       </p>
     </td>
   </tr>

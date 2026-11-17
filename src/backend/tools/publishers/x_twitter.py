@@ -141,3 +141,23 @@ class XPublisher(BaseSocialPublisher):
                 is_sandbox=False,
                 published_at=datetime.now(timezone.utc),
             )
+
+    async def delete_post(
+        self,
+        account: SocialAccountModel,
+        access_token: str,
+        remote_post_id: str,
+    ) -> bool:
+        """
+        Delete a tweet via X API v2 DELETE /2/tweets/:id
+        Requires OAuth 2.0 user-context with tweet.write scope.
+        """
+        if account.is_sandbox:
+            return True
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.delete(
+                f"{self.TWEETS_URL}/{remote_post_id}",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            return resp.status_code in (200, 204)

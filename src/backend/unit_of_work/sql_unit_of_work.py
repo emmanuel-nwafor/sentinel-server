@@ -7,26 +7,18 @@ from backend.repositories.social_account_repository import (
     SocialAccountRepository,
     ISocialAccountRepository,
 )
-from backend.repositories.email_otp_repository import (
-    EmailOtpRepository,
-    IEmailOtpRepository,
-)
+from backend.repositories.email_otp_repository import EmailOtpRepository, IEmailOtpRepository
 from backend.repositories.oauth_identity_repository import (
     OAuthIdentityRepository,
     IOAuthIdentityRepository,
 )
-from backend.repositories.customer_repository import (
-    CustomerRepository,
-    ICustomerRepository,
-)
+from backend.repositories.customer_repository import CustomerRepository, ICustomerRepository
 from backend.repositories.conversation_repository import (
     ConversationRepository,
     IConversationRepository,
 )
-from backend.repositories.message_repository import (
-    MessageRepository,
-    IMessageRepository,
-)
+from backend.repositories.message_repository import MessageRepository, IMessageRepository
+from backend.repositories.brand_voice_repository import BrandVoiceRepository, IBrandVoiceRepository
 
 
 class SqlAlchemyUnitOfWork(IUnitOfWork):
@@ -47,6 +39,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.customers: ICustomerRepository = CustomerRepository(self._session)
         self.conversations: IConversationRepository = ConversationRepository(self._session)
         self.messages: IMessageRepository = MessageRepository(self._session)
+        self.brand_voices: IBrandVoiceRepository = BrandVoiceRepository(self._session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:

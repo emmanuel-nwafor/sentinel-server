@@ -23,6 +23,59 @@ class SchedulePostRequest(BaseModel):
     )
 
 
+class AudienceCommentReply(BaseModel):
+    id: str
+    author_name: str
+    author_handle: str
+    avatar_text: Optional[str] = None
+    time_ago: str = "Just now"
+    content: str
+    replying_to_handle: Optional[str] = None
+    likes_count: int = 0
+    is_liked: bool = False
+
+
+class AudienceCommentItem(BaseModel):
+    id: str
+    author_name: str
+    author_handle: str
+    avatar_text: Optional[str] = None
+    time_ago: str = "Just now"
+    content: str
+    likes_count: int = 0
+    is_liked: bool = False
+    user_reply_text: Optional[str] = None
+    is_replied: bool = False
+    replies: List[AudienceCommentReply] = Field(default_factory=list)
+
+
+class AddCommentRequest(BaseModel):
+    content: str
+    author_name: Optional[str] = None
+    author_handle: Optional[str] = None
+    parent_comment_id: Optional[str] = None
+    replying_to_handle: Optional[str] = None
+
+
+class PostLikeResponse(BaseModel):
+    post_id: str
+    likes_count: int
+    is_liked: bool
+
+
+class CommentLikeResponse(BaseModel):
+    comment_id: str
+    likes_count: int
+    is_liked: bool
+
+
+class DeletePostResponse(BaseModel):
+    status: str
+    post_id: str
+    message: str
+    remote_deletions: Optional[Dict[str, bool]] = None
+
+
 class PostDetailResponse(BaseModel):
     id: str
     user_id: str
@@ -37,6 +90,11 @@ class PostDetailResponse(BaseModel):
     instagram_hashtags: List[str] = Field(default_factory=list)
     media: Optional[MediaAsset] = None
     publish_results: Optional[Dict[str, Any]] = None
+    views_count: int = 0
+    likes_count: int = 0
+    comments_count: int = 0
+    is_liked: bool = False
+    audience_comments: List[AudienceCommentItem] = Field(default_factory=list)
     scheduled_at: Optional[datetime] = None
     published_at: Optional[datetime] = None
     created_at: datetime

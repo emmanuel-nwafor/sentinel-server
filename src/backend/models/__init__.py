@@ -7,6 +7,7 @@ from backend.models.oauth_identity import OAuthIdentityModel, OAuthLoginProvider
 from backend.models.customer import CustomerModel
 from backend.models.conversation import ConversationModel
 from backend.models.message import MessageModel
+from backend.models.brand_voice import BrandVoiceModel
 
 __all__ = [
     "Base",
@@ -20,4 +21,5 @@ __all__ = [
     "CustomerModel",
     "ConversationModel",
     "MessageModel",
+    "BrandVoiceModel",
 ]

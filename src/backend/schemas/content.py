@@ -83,6 +83,7 @@ class ContentGenerationRequest(BaseModel):
     workspace: WorkspaceType = Field(default=WorkspaceType.CONTENT)
     media: Optional[MediaAsset] = None
     generate_image_prompt: bool = Field(default=False)
+    brand_voice_id: Optional[str] = Field(None, description="Optional UUID of a custom Brand Voice Persona (Pro feature)")
 
 
 class ContentGenerationResponse(BaseModel):

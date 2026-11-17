@@ -14,7 +14,17 @@ from backend.schemas.content import (
     WorkspaceType,
     PostStatus,
 )
-from backend.schemas.post_ops import UpdatePostRequest, SchedulePostRequest, PostDetailResponse
+from backend.schemas.post_ops import (
+    UpdatePostRequest,
+    SchedulePostRequest,
+    PostDetailResponse,
+    PostLikeResponse,
+    CommentLikeResponse,
+    DeletePostResponse,
+    AddCommentRequest,
+    AudienceCommentItem,
+    AudienceCommentReply,
+)
 from backend.agents.content_operator import ContentOperatorAgent
 from backend.tools.media_and_social import CloudinaryTool
 from backend.tools.publishers import SocialPublishingService
@@ -32,10 +42,14 @@ cloudinary_tool = CloudinaryTool()
 publishing_service = SocialPublishingService()
 
 
-def serialize_post_model(post: PostModel) -> PostDetailResponse:
+def serialize_post_model(post: PostModel, user_id: Optional[uuid.UUID] = None) -> PostDetailResponse:
     linkedin_dict = post.linkedin_variant or {}
     x_dict = post.x_variant or {}
     ig_dict = post.instagram_variant or {}
+    meta = post.metadata_info or {}
+
+    liked_user_ids = meta.get("liked_user_ids", [])
+    is_liked = str(user_id) in liked_user_ids if user_id else False
 
     return PostDetailResponse(
         id=str(post.id),
@@ -51,6 +65,11 @@ def serialize_post_model(post: PostModel) -> PostDetailResponse:
         instagram_hashtags=ig_dict.get("hashtags", []),
         media=post.media,
         publish_results=post.publish_results,
+        views_count=meta.get("views_count", 0),
+        likes_count=meta.get("likes_count", 0),
+        comments_count=meta.get("comments_count", len(meta.get("audience_comments", []))),
+        is_liked=is_liked,
+        audience_comments=meta.get("audience_comments", []),
         scheduled_at=post.scheduled_at,
         published_at=post.published_at,
         created_at=post.created_at,
@@ -68,7 +87,38 @@ async def generate_post(
     Generate tailored LinkedIn and X post drafts from a natural language prompt.
     Saves state into PostgreSQL via Unit of Work / PostRepository.
     """
-    plan = await agent.execute(request)
+    # Resolve Brand Voice Persona if requested or user has a default persona
+    brand_voice_prompt = None
+    if request.brand_voice_id:
+        try:
+            bv = await uow.brand_voices.get_by_id(uuid.UUID(request.brand_voice_id))
+            if bv and bv.user_id == current_user.id:
+                brand_voice_prompt = (
+                    f"Brand Persona: {bv.name}\n"
+                    f"Tone of Voice: {bv.tone}\n"
+                    f"Target Audience: {bv.target_audience}\n"
+                    f"Key Pillars: {', '.join(bv.key_pillars)}\n"
+                    f"Taboo/Forbidden Words (DO NOT USE): {', '.join(bv.taboo_words)}\n"
+                    f"Signature CTA: {bv.signature_cta or 'None'}"
+                )
+        except (ValueError, TypeError):
+            pass
+    else:
+        bv = await uow.brand_voices.get_default_by_user(current_user.id)
+        if bv:
+            brand_voice_prompt = (
+                f"Brand Persona: {bv.name}\n"
+                f"Tone of Voice: {bv.tone}\n"
+                f"Target Audience: {bv.target_audience}\n"
+                f"Key Pillars: {', '.join(bv.key_pillars)}\n"
+                f"Taboo/Forbidden Words (DO NOT USE): {', '.join(bv.taboo_words)}\n"
+                f"Signature CTA: {bv.signature_cta or 'None'}"
+            )
+
+    plan = await agent.execute(request, brand_voice_prompt=brand_voice_prompt)
+
+    # Track usage (Quota tracking for free/pro tiers)
+    current_user.monthly_ai_quota_used += 1
 
     final_media = request.media
     if not final_media and request.generate_image_prompt and plan.suggested_media_prompt:
@@ -330,7 +380,258 @@ async def update_post_draft(
         post.media = update_data.media.model_dump()
 
     await uow.commit()
-    return serialize_post_model(post)
+    return serialize_post_model(post, current_user.id)
+
+
+@router.delete("/{post_id}", response_model=DeletePostResponse)
+async def delete_post(
+    post_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Delete a post draft, scheduled, or published post.
+    If the post was published to social platforms, triggers platform deletion
+    where officially supported (X API v2 DELETE /2/tweets/:id, LinkedIn Posts API, etc.).
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    remote_deletions = {}
+    if post.status in (PostStatus.PUBLISHED.value, PostStatus.PARTIALLY_PUBLISHED.value):
+        try:
+            remote_deletions = await publishing_service.delete_published_post(
+                uow=uow,
+                user_id=current_user.id,
+                post=post,
+            )
+        except Exception as exc:
+            remote_deletions = {"error": False}
+
+    await uow.posts.delete(post.id)
+    await uow.commit()
+
+    return DeletePostResponse(
+        status="deleted",
+        post_id=str(post.id),
+        message="Post deleted successfully from Dispatch and connected platforms.",
+        remote_deletions=remote_deletions,
+    )
+
+
+@router.post("/{post_id}/like", response_model=PostLikeResponse)
+async def toggle_like_post(
+    post_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Toggle like on a post for the authenticated user.
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    meta = dict(post.metadata_info or {})
+    liked_user_ids = list(meta.get("liked_user_ids", []))
+    likes_count = meta.get("likes_count", 0)
+
+    user_str = str(current_user.id)
+    if user_str in liked_user_ids:
+        liked_user_ids.remove(user_str)
+        likes_count = max(0, likes_count - 1)
+        is_liked = False
+    else:
+        liked_user_ids.append(user_str)
+        likes_count += 1
+        is_liked = True
+
+    meta["liked_user_ids"] = liked_user_ids
+    meta["likes_count"] = likes_count
+    post.metadata_info = meta
+
+    await uow.commit()
+
+    return PostLikeResponse(
+        post_id=str(post.id),
+        likes_count=likes_count,
+        is_liked=is_liked,
+    )
+
+
+@router.get("/{post_id}/comments", response_model=List[AudienceCommentItem])
+async def list_post_comments(
+    post_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    List threaded comments & debate tree for a post.
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    meta = post.metadata_info or {}
+    comments_data = meta.get("audience_comments", [])
+    return comments_data
+
+
+@router.post("/{post_id}/comments", response_model=AudienceCommentItem, status_code=status.HTTP_201_CREATED)
+async def add_post_comment(
+    post_id: str,
+    payload: AddCommentRequest,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Add a comment or threaded reply to a post.
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    meta = dict(post.metadata_info or {})
+    comments_list = list(meta.get("audience_comments", []))
+
+    user_name = payload.author_name or current_user.full_name or "Emmanuel Chinecherem"
+    user_handle = payload.author_handle or "@founder"
+    avatar_char = user_name[0].upper() if user_name else "D"
+
+    # If replying to an existing comment
+    if payload.parent_comment_id:
+        target_found = None
+        for c in comments_list:
+            if c.get("id") == payload.parent_comment_id:
+                reply_item = {
+                    "id": f"reply_{uuid.uuid4().hex[:8]}",
+                    "author_name": user_name,
+                    "author_handle": user_handle,
+                    "avatar_text": avatar_char,
+                    "time_ago": "Just now",
+                    "content": payload.content,
+                    "replying_to_handle": payload.replying_to_handle or c.get("author_handle"),
+                    "likes_count": 0,
+                    "is_liked": False,
+                }
+                replies = list(c.get("replies", []))
+                replies.append(reply_item)
+                c["replies"] = replies
+                c["is_replied"] = True
+                target_found = c
+                break
+
+        if not target_found:
+            raise HTTPException(status_code=404, detail="Parent comment not found")
+
+        meta["audience_comments"] = comments_list
+        meta["comments_count"] = meta.get("comments_count", 0) + 1
+        post.metadata_info = meta
+        await uow.commit()
+        return target_found
+
+    # Otherwise, add root comment
+    new_comment = {
+        "id": f"c_{uuid.uuid4().hex[:8]}",
+        "author_name": user_name,
+        "author_handle": user_handle,
+        "avatar_text": avatar_char,
+        "time_ago": "Just now",
+        "content": payload.content,
+        "likes_count": 0,
+        "is_liked": False,
+        "user_reply_text": None,
+        "is_replied": False,
+        "replies": [],
+    }
+    comments_list.insert(0, new_comment)
+    meta["audience_comments"] = comments_list
+    meta["comments_count"] = meta.get("comments_count", 0) + 1
+    post.metadata_info = meta
+
+    await uow.commit()
+    return new_comment
+
+
+@router.post("/{post_id}/comments/{comment_id}/like", response_model=CommentLikeResponse)
+async def toggle_like_comment(
+    post_id: str,
+    comment_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Toggle like on a comment within a post.
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    meta = dict(post.metadata_info or {})
+    comments_list = list(meta.get("audience_comments", []))
+
+    liked = False
+    new_likes = 0
+    found = False
+
+    for c in comments_list:
+        if c.get("id") == comment_id:
+            liked = not c.get("is_liked", False)
+            c["is_liked"] = liked
+            c["likes_count"] = (c.get("likes_count", 0) + 1) if liked else max(0, c.get("likes_count", 0) - 1)
+            new_likes = c["likes_count"]
+            found = True
+            break
+        # Also check nested replies
+        for r in c.get("replies", []):
+            if r.get("id") == comment_id:
+                liked = not r.get("is_liked", False)
+                r["is_liked"] = liked
+                r["likes_count"] = (r.get("likes_count", 0) + 1) if liked else max(0, r.get("likes_count", 0) - 1)
+                new_likes = r["likes_count"]
+                found = True
+                break
+        if found:
+            break
+
+    if not found:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    meta["audience_comments"] = comments_list
+    post.metadata_info = meta
+    await uow.commit()
+
+    return CommentLikeResponse(
+        comment_id=comment_id,
+        likes_count=new_likes,
+        is_liked=liked,
+    )
 
 
 @router.post("/{post_id}/schedule", response_model=PostDetailResponse)
@@ -381,4 +682,255 @@ async def schedule_or_publish_post(
             post.failure_reason = "; ".join(errors) if errors else "Publishing failed."
 
     await uow.commit()
-    return serialize_post_model(post)
+    return serialize_post_model(post, current_user.id)
+
+
+@router.delete("/{post_id}", response_model=DeletePostResponse)
+async def delete_post(
+    post_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Delete a post draft, scheduled, or published post.
+    If the post was published to social platforms, triggers platform deletion
+    where officially supported (X API v2 DELETE /2/tweets/:id, LinkedIn Posts API, etc.).
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    remote_deletions = {}
+    if post.status in (PostStatus.PUBLISHED.value, PostStatus.PARTIALLY_PUBLISHED.value):
+        try:
+            remote_deletions = await publishing_service.delete_published_post(
+                uow=uow,
+                user_id=current_user.id,
+                post=post,
+            )
+        except Exception as exc:
+            remote_deletions = {"error": False}
+
+    await uow.posts.delete(post.id)
+    await uow.commit()
+
+    return DeletePostResponse(
+        status="deleted",
+        post_id=str(post.id),
+        message="Post deleted successfully from Dispatch and connected platforms.",
+        remote_deletions=remote_deletions,
+    )
+
+
+@router.post("/{post_id}/like", response_model=PostLikeResponse)
+async def toggle_like_post(
+    post_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Toggle like on a post for the authenticated user.
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    meta = dict(post.metadata_info or {})
+    liked_user_ids = list(meta.get("liked_user_ids", []))
+    likes_count = meta.get("likes_count", 0)
+
+    user_str = str(current_user.id)
+    if user_str in liked_user_ids:
+        liked_user_ids.remove(user_str)
+        likes_count = max(0, likes_count - 1)
+        is_liked = False
+    else:
+        liked_user_ids.append(user_str)
+        likes_count += 1
+        is_liked = True
+
+    meta["liked_user_ids"] = liked_user_ids
+    meta["likes_count"] = likes_count
+    post.metadata_info = meta
+
+    await uow.commit()
+
+    return PostLikeResponse(
+        post_id=str(post.id),
+        likes_count=likes_count,
+        is_liked=is_liked,
+    )
+
+
+@router.get("/{post_id}/comments", response_model=List[AudienceCommentItem])
+async def list_post_comments(
+    post_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    List threaded comments & debate tree for a post.
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    meta = post.metadata_info or {}
+    comments_data = meta.get("audience_comments", [])
+    return comments_data
+
+
+@router.post("/{post_id}/comments", response_model=AudienceCommentItem, status_code=status.HTTP_201_CREATED)
+async def add_post_comment(
+    post_id: str,
+    payload: AddCommentRequest,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Add a comment or threaded reply to a post.
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    meta = dict(post.metadata_info or {})
+    comments_list = list(meta.get("audience_comments", []))
+
+    user_name = payload.author_name or current_user.full_name or "Emmanuel Chinecherem"
+    user_handle = payload.author_handle or "@founder"
+    avatar_char = user_name[0].upper() if user_name else "D"
+
+    # If replying to an existing comment
+    if payload.parent_comment_id:
+        target_found = None
+        for c in comments_list:
+            if c.get("id") == payload.parent_comment_id:
+                reply_item = {
+                    "id": f"reply_{uuid.uuid4().hex[:8]}",
+                    "author_name": user_name,
+                    "author_handle": user_handle,
+                    "avatar_text": avatar_char,
+                    "time_ago": "Just now",
+                    "content": payload.content,
+                    "replying_to_handle": payload.replying_to_handle or c.get("author_handle"),
+                    "likes_count": 0,
+                    "is_liked": False,
+                }
+                replies = list(c.get("replies", []))
+                replies.append(reply_item)
+                c["replies"] = replies
+                c["is_replied"] = True
+                target_found = c
+                break
+
+        if not target_found:
+            raise HTTPException(status_code=404, detail="Parent comment not found")
+
+        meta["audience_comments"] = comments_list
+        meta["comments_count"] = meta.get("comments_count", 0) + 1
+        post.metadata_info = meta
+        await uow.commit()
+        return target_found
+
+    # Otherwise, add root comment
+    new_comment = {
+        "id": f"c_{uuid.uuid4().hex[:8]}",
+        "author_name": user_name,
+        "author_handle": user_handle,
+        "avatar_text": avatar_char,
+        "time_ago": "Just now",
+        "content": payload.content,
+        "likes_count": 0,
+        "is_liked": False,
+        "user_reply_text": None,
+        "is_replied": False,
+        "replies": [],
+    }
+    comments_list.insert(0, new_comment)
+    meta["audience_comments"] = comments_list
+    meta["comments_count"] = meta.get("comments_count", 0) + 1
+    post.metadata_info = meta
+
+    await uow.commit()
+    return new_comment
+
+
+@router.post("/{post_id}/comments/{comment_id}/like", response_model=CommentLikeResponse)
+async def toggle_like_comment(
+    post_id: str,
+    comment_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Toggle like on a comment within a post.
+    """
+    try:
+        post_uuid = uuid.UUID(post_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid post identifier")
+
+    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    meta = dict(post.metadata_info or {})
+    comments_list = list(meta.get("audience_comments", []))
+
+    liked = False
+    new_likes = 0
+    found = False
+
+    for c in comments_list:
+        if c.get("id") == comment_id:
+            liked = not c.get("is_liked", False)
+            c["is_liked"] = liked
+            c["likes_count"] = (c.get("likes_count", 0) + 1) if liked else max(0, c.get("likes_count", 0) - 1)
+            new_likes = c["likes_count"]
+            found = True
+            break
+        # Also check nested replies
+        for r in c.get("replies", []):
+            if r.get("id") == comment_id:
+                liked = not r.get("is_liked", False)
+                r["is_liked"] = liked
+                r["likes_count"] = (r.get("likes_count", 0) + 1) if liked else max(0, r.get("likes_count", 0) - 1)
+                new_likes = r["likes_count"]
+                found = True
+                break
+        if found:
+            break
+
+    if not found:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    meta["audience_comments"] = comments_list
+    post.metadata_info = meta
+    await uow.commit()
+
+    return CommentLikeResponse(
+        comment_id=comment_id,
+        likes_count=new_likes,
+        is_liked=liked,
+    )

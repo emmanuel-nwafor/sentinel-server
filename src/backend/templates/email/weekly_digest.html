@@ -2,35 +2,41 @@
 
 {% block content %}
 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-  <!-- Header Title -->
+  <!-- Category Badge -->
   <tr>
-    <td align="left" style="padding-bottom: 8px;">
-      <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #f1f5f9; color: #475569; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        Weekly Report
+    <td align="left" style="padding-bottom: 12px;">
+      <span style="display: inline-block; padding: 4px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Executive Operations Digest
       </span>
-      <h1 class="title-text" style="margin: 12px 0 4px 0; font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; line-height: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        Your Weekly Dispatch Summary 📈
+    </td>
+  </tr>
+
+  <!-- Main Headline -->
+  <tr>
+    <td align="left" style="padding-bottom: 16px;">
+      <h1 class="title-text" style="margin: 0; font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; line-height: 34px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Your Weekly {{ brand_name | default("Sentinel") }} Summary 📈
       </h1>
-      <p style="margin: 0; font-size: 14px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        Here is how your business operations performed this past week, {{ user_name }}.
+      <p style="margin: 10px 0 0 0; font-size: 15px; line-height: 24px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Hi {{ user_name }}, here is a high-level briefing of your social operations, publication velocity, and customer support metrics over the past 7 days.
       </p>
     </td>
   </tr>
 
   <!-- 3-Column Metrics Grid (Responsive Stacking on Mobile) -->
   <tr>
-    <td align="center" style="padding: 24px 0;">
+    <td align="center" style="padding: 16px 0 24px 0;">
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
           <!-- Metric 1: Posts Published -->
           <td class="metric-col" valign="top" style="padding: 0 6px 12px 0; width: 33.33%;">
             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
               <tr>
-                <td align="center" style="padding: 16px 8px;">
-                  <span style="font-size: 28px; font-weight: 800; color: #0f172a; display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    {{ total_posts | default("12") }}
+                <td align="center" style="padding: 18px 8px;">
+                  <span style="font-size: 30px; font-weight: 800; color: #0f172a; display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    {{ total_posts | default("14") }}
                   </span>
-                  <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                     Posts Live
                   </span>
                 </td>
@@ -38,16 +44,16 @@
             </table>
           </td>
 
-          <!-- Metric 2: Inquiries Handled -->
+          <!-- Metric 2: DMs Answered -->
           <td class="metric-col" valign="top" style="padding: 0 3px 12px 3px; width: 33.33%;">
             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
               <tr>
-                <td align="center" style="padding: 16px 8px;">
-                  <span style="font-size: 28px; font-weight: 800; color: #2563eb; display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    {{ total_inquiries | default("48") }}
+                <td align="center" style="padding: 18px 8px;">
+                  <span style="font-size: 30px; font-weight: 800; color: #2563eb; display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    {{ total_inquiries | default("52") }}
                   </span>
-                  <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    DMs Answered
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    Inquiries Handled
                   </span>
                 </td>
               </tr>
@@ -58,11 +64,11 @@
           <td class="metric-col" valign="top" style="padding: 0 0 12px 6px; width: 33.33%;">
             <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
               <tr>
-                <td align="center" style="padding: 16px 8px;">
-                  <span style="font-size: 28px; font-weight: 800; color: #16a34a; display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                    {{ time_saved_hours | default("6.5h") }}
+                <td align="center" style="padding: 18px 8px;">
+                  <span style="font-size: 30px; font-weight: 800; color: #059669; display: block; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    {{ time_saved_hours | default("7.5h") }}
                   </span>
-                  <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                     Time Saved
                   </span>
                 </td>
@@ -74,17 +80,17 @@
     </td>
   </tr>
 
-  <!-- Highlights / AI Insights -->
+  <!-- AI Executive Strategy Recommendation -->
   <tr>
     <td align="left" style="padding-bottom: 24px;">
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px;">
         <tr>
-          <td style="padding: 18px;">
-            <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              🤖 AI Operations Insight
+          <td style="padding: 20px 22px;">
+            <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: 0.6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              🤖 Gemini Strategic Operations Recommendation:
             </p>
-            <p style="margin: 0; font-size: 14px; line-height: 22px; color: #15803d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              {{ ai_insight | default("Your customer response rate increased by 42% thanks to AI suggested replies. Posts scheduled between 12:00 PM and 2:00 PM had the highest engagement across LinkedIn and Instagram.") }}
+            <p style="margin: 0; font-size: 14px; line-height: 22px; color: #14532d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              {{ ai_insight | default("Storytelling posts published mid-day on LinkedIn drove 48% higher comment depth than standard announcements. We recommend preparing 2 voice-recorded breakdown posts for Tuesday and Thursday to capitalize on peak executive attention.") }}
             </p>
           </td>
         </tr>
@@ -92,18 +98,27 @@
     </td>
   </tr>
 
-  <!-- CTA -->
+  <!-- Primary Analytics CTA Button -->
   <tr>
-    <td align="center" style="padding-bottom: 20px;">
+    <td align="center" style="padding: 4px 0 24px 0;">
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
         <tr>
           <td align="center" bgcolor="#09090b" style="border-radius: 8px; background-color: #09090b;">
-            <a href="https://dispatch.io/analytics" class="responsive-button" style="display: inline-block; padding: 14px 36px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
-              View Full Analytics &rarr;
+            <a href="{{ analytics_url | default('https://sentinel.ai/analytics') }}" class="responsive-button" style="display: inline-block; padding: 14px 40px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+              Open Performance Dashboard &rarr;
             </a>
           </td>
         </tr>
       </table>
+    </td>
+  </tr>
+
+  <!-- Footer Tip -->
+  <tr>
+    <td align="left" style="border-top: 1px dashed #e2e8f0; padding-top: 18px;">
+      <p style="margin: 0; font-size: 12px; line-height: 18px; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Weekly digests are generated every Monday at 08:00 UTC. To customize your reporting interval or recipient list, update your <a href="{{ preferences_url | default('https://sentinel.ai/settings/notifications') }}" style="color: #64748b; text-decoration: underline;">Notification Preferences</a>.
+      </p>
     </td>
   </tr>
 </table>

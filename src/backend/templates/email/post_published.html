@@ -2,50 +2,81 @@
 
 {% block content %}
 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <!-- Success Badge -->
   <tr>
     <td align="left" style="padding-bottom: 12px;">
-      <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #ecfdf5; color: #059669; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        Post Published Successfully
+      <span style="display: inline-block; padding: 4px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Distribution Confirmed &bull; Live
       </span>
-      <h1 class="title-text" style="margin: 12px 0 6px 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; line-height: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        Your post is now live on {{ platform_name }}! 🚀
+    </td>
+  </tr>
+
+  <!-- Heading -->
+  <tr>
+    <td align="left" style="padding-bottom: 16px;">
+      <h1 class="title-text" style="margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; line-height: 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Your post is now live on {{ platform_name | default("Social Channels") }}! 🚀
       </h1>
-      <p style="margin: 0; font-size: 14px; line-height: 22px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        Hi {{ user_name }}, your scheduled post was successfully published via Dispatch.
+      <p style="margin: 10px 0 0 0; font-size: 15px; line-height: 24px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Hi {{ user_name }}, your scheduled post was successfully published via the {{ brand_name | default("Sentinel") }} server-side dispatcher.
       </p>
     </td>
   </tr>
 
-  <!-- Content Snippet Card -->
+  <!-- Post Details Preview Card -->
   <tr>
-    <td align="left" style="padding: 16px 0 24px 0;">
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+    <td align="left" style="padding: 12px 0 24px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px;">
         <tr>
-          <td style="padding: 20px;">
-            <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              Published Caption Preview:
-            </p>
-            <p style="margin: 0; font-size: 14px; line-height: 22px; color: #1e293b; font-style: italic; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              "{{ post_excerpt | default('Excited to announce our newest update...') }}"
-            </p>
+          <td style="padding: 22px 20px;">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td align="left" style="padding-bottom: 10px;">
+                  <span style="display: inline-block; padding: 3px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; border-radius: 6px; background-color: #09090b; color: #ffffff; letter-spacing: 0.5px;">
+                    {{ platform_name | default("LinkedIn") }}
+                  </span>
+                  {% if published_time %}
+                  <span style="font-size: 12px; color: #94a3b8; margin-left: 8px;">
+                    Published at {{ published_time }}
+                  </span>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td align="left">
+                  <div style="font-size: 14px; line-height: 22px; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; white-space: pre-line; border-left: 3px solid #3b82f6; padding-left: 14px; margin: 4px 0;">
+                    {{ post_excerpt | default("Strategic business insights generated with Sentinel Content Operator Agent...") }}
+                  </div>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
       </table>
     </td>
   </tr>
 
-  <!-- Action CTA -->
+  <!-- Direct Call-to-Action -->
   <tr>
-    <td align="center" style="padding-bottom: 20px;">
+    <td align="center" style="padding: 4px 0 24px 0;">
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
         <tr>
-          <td align="center" bgcolor="#09090b" style="border-radius: 8px; background-color: #09090b;">
-            <a href="{{ post_url | default('https://dispatch.io/posts') }}" class="responsive-button" style="display: inline-block; padding: 14px 36px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
-              View Live Post &rarr;
+          <td align="center" bgcolor="#2563eb" style="border-radius: 8px; background-color: #2563eb;">
+            <a href="{{ post_url | default('https://sentinel.ai/posts') }}" class="responsive-button" style="display: inline-block; padding: 14px 38px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+              View Published Post &rarr;
             </a>
           </td>
         </tr>
       </table>
+    </td>
+  </tr>
+
+  <!-- Pro Tip Box -->
+  <tr>
+    <td align="left" style="border-top: 1px dashed #e2e8f0; padding-top: 18px;">
+      <p style="margin: 0; font-size: 13px; line-height: 20px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        💡 <strong>Engagement Pro-Tip:</strong> Comments left within the first 60 minutes after posting dramatically improve algorithmic reach. Incoming replies will sync directly into your <a href="{{ inbox_url | default('https://sentinel.ai/inbox') }}" style="color: #2563eb; text-decoration: underline;">Sentinel Unified Inbox</a>.
+      </p>
     </td>
   </tr>
 </table>

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block content %}
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+  <!-- Exclusive Badge -->
+  <tr>
+    <td align="left" style="padding-bottom: 12px;">
+      <span style="display: inline-block; padding: 4px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-radius: 9999px; background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ offer_badge | default("Special Creator Access") }}
+      </span>
+    </td>
+  </tr>
+
+  <!-- Main Headline -->
+  <tr>
+    <td align="left" style="padding-bottom: 16px;">
+      <h1 class="title-text" style="margin: 0; font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.6px; line-height: 34px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        {{ offer_headline | default("Upgrade to Sentinel Pro: Unlock Unlimited AI Publishing") }}
+      </h1>
+      <p style="margin: 12px 0 0 0; font-size: 15px; line-height: 24px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Hi {{ user_name }}, as one of our early power creators, you have unlocked an exclusive early-adopter rate on Sentinel Pro.
+      </p>
+    </td>
+  </tr>
+
+  <!-- Promotional Voucher / Pricing Card -->
+  <tr>
+    <td align="center" style="padding: 12px 0 24px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #09090b; border-radius: 14px; color: #ffffff;">
+        <tr>
+          <td align="center" style="padding: 28px 24px;">
+            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #60a5fa; display: block; margin-bottom: 8px;">
+              {{ discount_label | default("Special 40% Off Annual Plan") }}
+            </span>
+            <div style="font-size: 38px; font-weight: 800; letter-spacing: -1px; color: #ffffff; padding: 4px 0;">
+              {{ discounted_price | default("$19") }}<span style="font-size: 16px; font-weight: 500; color: #94a3b8;"> / month</span>
+            </div>
+            <p style="margin: 6px 0 16px 0; font-size: 13px; color: #cbd5e1;">
+              Billed annually &bull; Use code <strong style="color: #60a5fa; font-family: 'Courier New', monospace;">{{ coupon_code | default("CREATOR40") }}</strong> at checkout
+            </p>
+
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-top: 1px solid #27272a; padding-top: 16px; text-align: left;">
+              <tr>
+                <td style="font-size: 13px; line-height: 22px; color: #e4e4e7;">
+                  ✔ Unlimited multi-channel posts (LinkedIn, X, Instagram)<br />
+                  ✔ Dedicated AI Brand Voice Persona engine<br />
+                  ✔ Smart algorithmic scheduling &amp; unified inbox co-pilot<br />
+                  ✔ Priority support with 99.9% uptime SLA
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- CTA Button -->
+  <tr>
+    <td align="center" style="padding: 4px 0 24px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+        <tr>
+          <td align="center" bgcolor="#2563eb" style="border-radius: 8px; background-color: #2563eb;">
+            <a href="{{ claim_url | default('https://sentinel.ai/pricing?code=CREATOR40') }}" class="responsive-button" style="display: inline-block; padding: 15px 42px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 8px;">
+              {{ cta_text | default("Claim Your Pro Discount &rarr;") }}
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Expiration & Terms Footnote -->
+  <tr>
+    <td align="center" style="border-top: 1px dashed #e2e8f0; padding-top: 18px;">
+      <p style="margin: 0; font-size: 11px; line-height: 16px; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Offer valid through {{ expiry_date | default("this weekend") }}. Guaranteed 30-day money-back guarantee.<br />
+        <a href="{{ preferences_url | default('https://sentinel.ai/settings/notifications') }}" style="color: #64748b; text-decoration: underline;">Manage email preferences</a> or <a href="{{ unsubscribe_url | default('https://sentinel.ai/unsubscribe') }}" style="color: #64748b; text-decoration: underline;">unsubscribe</a>.
+      </p>
+    </td>
+  </tr>
+</table>
+{% endblock %}

@@ -5,10 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="x-apple-disable-message-reformatting" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>{{ subject | default("Dispatch Notification") }}</title>
+  <meta name="color-scheme" content="light dark" />
+  <meta name="supported-color-schemes" content="light dark" />
+  <title>{{ subject | default("Sentinel AI Operations Notification") }}</title>
   <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:AllowPNG/>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
   <style type="text/css">
-    body, table, td { font-family: Arial, Helvetica, sans-serif !important; }
+    body, table, td, p, a, span { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important; }
   </style>
   <![endif]-->
   <style type="text/css">
@@ -20,7 +30,7 @@
       height: 100% !important;
       -webkit-text-size-adjust: 100% !important;
       -ms-text-size-adjust: 100% !important;
-      background-color: #f1f5f9;
+      background-color: #f8fafc;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
     table {
@@ -39,10 +49,10 @@
       text-decoration: none;
     }
 
-    /* Mobile Responsive Breakpoint */
-    @media only screen and (max-width: 600px) {
+    /* Mobile Responsive Breakpoints */
+    @media only screen and (max-width: 620px) {
       .email-wrapper {
-        padding: 8px !important;
+        padding: 12px 8px !important;
       }
       .email-card {
         width: 100% !important;
@@ -53,13 +63,13 @@
         padding: 20px 20px !important;
       }
       .content-padding {
-        padding: 24px 20px !important;
+        padding: 28px 20px !important;
       }
       .footer-padding {
-        padding: 20px 20px !important;
+        padding: 24px 20px !important;
       }
       .otp-display {
-        font-size: 30px !important;
+        font-size: 32px !important;
         letter-spacing: 6px !important;
         padding: 16px 8px !important;
       }
@@ -73,18 +83,33 @@
       .metric-col {
         display: block !important;
         width: 100% !important;
-        margin-bottom: 12px !important;
+        padding: 0 0 12px 0 !important;
       }
       .title-text {
         font-size: 22px !important;
         line-height: 28px !important;
       }
+      .step-icon-col {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 8px !important;
+      }
+      .step-text-col {
+        display: block !important;
+        width: 100% !important;
+      }
     }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9; -webkit-font-smoothing: antialiased;">
-  <!-- Outer Full-Width Wrapper Table -->
-  <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#f1f5f9" class="email-wrapper" style="background-color: #f1f5f9; padding: 32px 12px;">
+<body style="margin: 0; padding: 0; background-color: #f8fafc; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;">
+  <!-- Hidden Preheader: Prevents inbox email preview snippet leakage -->
+  <div style="display: none; max-height: 0px; overflow: hidden; mso-hide: all; font-size: 1px; line-height: 1px; max-width: 0px; opacity: 0;">
+    {{ preheader | default("Automate your business operations, social publishing, and AI workflows with Sentinel.") }}
+    &#847; &zwnj; &nbsp; &#8199; &shy; &#847; &zwnj; &nbsp; &#8199; &shy; &#847; &zwnj; &nbsp; &#8199; &shy; &#847; &zwnj; &nbsp; &#8199; &shy; &#847; &zwnj; &nbsp; &#8199; &shy;
+  </div>
+
+  <!-- Full-Width Outer Canvas Table -->
+  <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#f8fafc" class="email-wrapper" style="background-color: #f8fafc; padding: 40px 16px;">
     <tr>
       <td align="center" valign="top">
 
@@ -95,19 +120,24 @@
         <![endif]-->
 
         <!-- Central Card Container Table (Max 600px) -->
-        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="email-card" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="email-card" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.05), 0 4px 6px -4px rgba(15, 23, 42, 0.025);">
 
           <!-- Brand Header -->
           <tr>
-            <td align="left" bgcolor="#09090b" class="header-padding" style="background-color: #09090b; padding: 24px 32px; border-bottom: 1px solid #1e293b;">
+            <td align="left" bgcolor="#09090b" class="header-padding" style="background-color: #09090b; padding: 26px 36px; border-bottom: 1px solid #1e293b;">
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td align="left" valign="middle">
-                    <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                      Dispatch<span style="color: #3b82f6;">.</span>io
+                    <span style="font-size: 21px; font-weight: 800; letter-spacing: -0.6px; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      {{ brand_name | default("Sentinel") }}<span style="color: #3b82f6;">.</span>ai
                     </span>
-                    <span style="display: inline-block; margin-left: 10px; padding: 3px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border-radius: 9999px; background-color: rgba(59, 130, 246, 0.2); color: #60a5fa; vertical-align: middle;">
-                      {{ header_badge | default("Platform") }}
+                    <span style="display: inline-block; margin-left: 12px; padding: 3px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border-radius: 9999px; background-color: rgba(59, 130, 246, 0.18); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.3); vertical-align: middle;">
+                      {{ header_badge | default("Operations") }}
+                    </span>
+                  </td>
+                  <td align="right" valign="middle">
+                    <span style="font-size: 12px; color: #94a3b8; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      {{ header_right_text | default("Command Center") }}
                     </span>
                   </td>
                 </tr>
@@ -117,21 +147,54 @@
 
           <!-- Dynamic Email Content Block -->
           <tr>
-            <td align="left" class="content-padding" style="padding: 36px 32px; background-color: #ffffff;">
+            <td align="left" class="content-padding" style="padding: 38px 36px; background-color: #ffffff;">
               {% block content %}{% endblock %}
             </td>
           </tr>
 
-          <!-- Unified Professional Footer -->
+          <!-- Unified Enterprise Footer -->
           <tr>
-            <td align="center" bgcolor="#f8fafc" class="footer-padding" style="background-color: #f8fafc; padding: 24px 32px; border-top: 1px solid #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              <p style="margin: 0 0 8px 0; font-size: 12px; line-height: 18px; color: #64748b; text-align: center;">
-                Sent with care by <strong>Dispatch AI Operations Platform</strong> &bull; <a href="https://dispatch.io" style="color: #3b82f6; text-decoration: none;">dispatch.io</a>
-              </p>
-              <p style="margin: 0; font-size: 11px; line-height: 16px; color: #94a3b8; text-align: center;">
-                If you have questions, reply directly to this email or visit our <a href="https://dispatch.io/help" style="color: #64748b; text-decoration: underline;">Support Center</a>.<br />
-                &copy; {{ current_year | default("2026") }} Dispatch Technologies Inc. All rights reserved.
-              </p>
+            <td align="center" bgcolor="#f8fafc" class="footer-padding" style="background-color: #f8fafc; padding: 28px 36px; border-top: 1px solid #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="padding-bottom: 12px;">
+                    <p style="margin: 0; font-size: 13px; line-height: 20px; font-weight: 600; color: #475569; text-align: center;">
+                      {{ brand_name | default("Sentinel") }} AI Operations Platform
+                    </p>
+                    <p style="margin: 4px 0 0 0; font-size: 12px; line-height: 18px; color: #64748b; text-align: center;">
+                      Autonomous social operations, voice-to-post generation, and multi-channel publishing.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding-bottom: 16px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                      <tr>
+                        <td style="padding: 0 10px;">
+                          <a href="{{ dashboard_url | default('https://sentinel.ai/dashboard') }}" style="font-size: 12px; color: #3b82f6; text-decoration: none; font-weight: 600;">Dashboard</a>
+                        </td>
+                        <td style="color: #cbd5e1; font-size: 12px;">&bull;</td>
+                        <td style="padding: 0 10px;">
+                          <a href="{{ support_url | default('https://sentinel.ai/support') }}" style="font-size: 12px; color: #64748b; text-decoration: none;">Help & Support</a>
+                        </td>
+                        <td style="color: #cbd5e1; font-size: 12px;">&bull;</td>
+                        <td style="padding: 0 10px;">
+                          <a href="{{ preferences_url | default('https://sentinel.ai/settings/notifications') }}" style="font-size: 12px; color: #64748b; text-decoration: none;">Notification Settings</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="border-top: 1px solid #e2e8f0; padding-top: 16px;">
+                    <p style="margin: 0; font-size: 11px; line-height: 16px; color: #94a3b8; text-align: center;">
+                      This is an automated communication sent by {{ brand_name | default("Sentinel") }} Technologies Inc.<br />
+                      548 Market Street, Suite 32001, San Francisco, CA 94104<br />
+                      &copy; {{ current_year | default("2026") }} {{ brand_name | default("Sentinel") }} Technologies. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
@@ -147,6 +210,6 @@
       </td>
     </tr>
   </table>
-  <!-- End Outer Table -->
+  <!-- End Canvas Table -->
 </body>
 </html>

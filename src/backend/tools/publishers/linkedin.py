@@ -223,3 +223,25 @@ class LinkedInPublisher(BaseSocialPublisher):
                 is_sandbox=False,
                 published_at=datetime.now(timezone.utc),
             )
+
+    async def delete_post(
+        self,
+        account: SocialAccountModel,
+        access_token: str,
+        remote_post_id: str,
+    ) -> bool:
+        """
+        Delete a post via LinkedIn Posts API DELETE /rest/posts/{postUrn}
+        Requires w_member_social scope.
+        """
+        if account.is_sandbox:
+            return True
+
+        from urllib.parse import quote
+        encoded_urn = quote(remote_post_id, safe="")
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.delete(
+                f"{self.POSTS_API_URL}/{encoded_urn}",
+                headers=self._rest_headers(access_token),
+            )
+            return resp.status_code in (200, 204)

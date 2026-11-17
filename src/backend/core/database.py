@@ -1,14 +1,44 @@
 import logging
 from typing import AsyncGenerator
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from backend.core.config import settings
 from backend.models import Base  # Ensures all ORM models register on Base.metadata
 
 logger = logging.getLogger(__name__)
 
+
+def normalize_database_url(url: str) -> str:
+    """
+    Ensure the connection string uses the asyncpg driver and clean query parameters.
+    Handles Neon, Supabase, Railway, and AWS RDS query formats.
+    """
+    if not url:
+        return url
+
+    parsed = urlparse(url)
+    scheme = parsed.scheme
+
+    if scheme in ("postgres", "postgresql"):
+        scheme = "postgresql+asyncpg"
+    elif scheme == "sqlite":
+        scheme = "sqlite+aiosqlite"
+
+    query_params = parse_qs(parsed.query)
+    # Remove asyncpg-incompatible parameters
+    query_params.pop("channel_binding", None)
+    if "sslmode" in query_params:
+        query_params["ssl"] = query_params.pop("sslmode")
+
+    new_query = urlencode(query_params, doseq=True)
+    return urlunparse((scheme, parsed.netloc, parsed.path, parsed.params, new_query, parsed.fragment))
+
+
+DATABASE_URL = normalize_database_url(settings.DATABASE_URL)
+
 # Create Async Engine for PostgreSQL
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     echo=settings.ENVIRONMENT == "development",
     future=True,
     pool_pre_ping=True,
