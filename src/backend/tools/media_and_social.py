@@ -3,6 +3,7 @@ import uuid
 import hashlib
 import logging
 from typing import Dict, Any, Optional
+import httpx
 import boto3
 from botocore.config import Config
 from backend.core.config import settings
@@ -99,7 +100,16 @@ class CloudinaryTool:
         self.api_key = settings.CLOUDINARY_API_KEY
         self.api_secret = settings.CLOUDINARY_API_SECRET
 
-    def generate_upload_signature(self, folder: str = "sentinel_posts") -> Dict[str, Any]:
+    @property
+    def is_configured(self) -> bool:
+        return bool(
+            self.cloud_name
+            and self.api_key
+            and self.api_secret
+            and self.cloud_name != "sentinel_demo_cloud"
+        )
+
+    def generate_upload_signature(self, folder: str = "dispatch_posts") -> Dict[str, Any]:
         timestamp = int(time.time())
         params_to_sign = f"folder={folder}&timestamp={timestamp}{self.api_secret}"
         signature = hashlib.sha1(params_to_sign.encode("utf-8")).hexdigest()
@@ -111,6 +121,8 @@ class CloudinaryTool:
             "timestamp": timestamp,
             "api_key": self.api_key,
             "cloud_name": self.cloud_name,
+            "folder": folder,
+            "is_sandbox": not self.is_configured,
         }
 
     def create_placeholder_ai_asset(self, prompt: str) -> MediaAsset:
@@ -118,25 +130,114 @@ class CloudinaryTool:
         return MediaAsset(
             type="image",
             provider="cloudinary",
-            url=f"https://res.cloudinary.com/{self.cloud_name}/image/upload/v1/sentinel_ai_{safe_name}.png",
-            public_id=f"sentinel_ai_{safe_name}",
+            url=f"https://res.cloudinary.com/{self.cloud_name}/image/upload/v1/dispatch_ai_{safe_name}.png",
+            public_id=f"dispatch_ai_{safe_name}",
         )
 
 
 class MuxTool:
-    """Deterministic tool for generating direct video upload endpoints to MUX."""
+    """Tool for direct video upload endpoints to MUX (Video API)."""
 
     def __init__(self):
         self.token_id = settings.MUX_TOKEN_ID
         self.token_secret = settings.MUX_TOKEN_SECRET
 
+    @property
+    def is_configured(self) -> bool:
+        return bool(
+            self.token_id
+            and self.token_secret
+            and self.token_id != "sentinel_mux_token_id"
+        )
+
     async def create_direct_upload_url(self) -> Dict[str, Any]:
+        """
+        Calls MUX Video Direct Upload API to create a direct upload slot.
+        Falls back to a sandbox slot if MUX keys are demo or not yet configured.
+        """
+        if self.is_configured:
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.post(
+                        "https://api.mux.com/video/v1/uploads",
+                        auth=(self.token_id, self.token_secret),
+                        json={
+                            "cors_origin": "*",
+                            "new_asset_settings": {
+                                "playback_policy": ["public"],
+                                "mp4_support": "standard",
+                            },
+                        },
+                    )
+                    if resp.status_code < 400:
+                        data = resp.json().get("data", {})
+                        return {
+                            "provider": "mux",
+                            "upload_url": data.get("url"),
+                            "upload_id": data.get("id"),
+                            "method": "PUT",
+                            "is_sandbox": False,
+                        }
+                    else:
+                        logger.warning("Mux API error (%d): %s", resp.status_code, resp.text)
+            except Exception as exc:
+                logger.warning("Mux API connection failed: %s", exc)
+
         upload_id = f"mux_upload_{int(time.time())}"
         return {
             "provider": "mux",
             "upload_url": f"https://storage.googleapis.com/mux-mock-uploads/{upload_id}",
             "upload_id": upload_id,
+            "method": "PUT",
+            "is_sandbox": True,
         }
+
+    async def get_upload_status(self, upload_id: str) -> Dict[str, Any]:
+        """
+        Polls MUX to check if direct upload has processed, returning public playback & mp4 URLs.
+        """
+        if not self.is_configured:
+            return {
+                "status": "ready",
+                "playback_url": f"https://stream.mux.com/{upload_id}.m3u8",
+                "mp4_url": f"https://stream.mux.com/{upload_id}/high.mp4",
+                "thumbnail_url": f"https://image.mux.com/{upload_id}/thumbnail.jpg",
+                "is_sandbox": True,
+            }
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(
+                    f"https://api.mux.com/video/v1/uploads/{upload_id}",
+                    auth=(self.token_id, self.token_secret),
+                )
+                if resp.status_code < 400:
+                    data = resp.json().get("data", {})
+                    asset_id = data.get("asset_id")
+                    status = data.get("status")
+                    if asset_id:
+                        asset_resp = await client.get(
+                            f"https://api.mux.com/video/v1/assets/{asset_id}",
+                            auth=(self.token_id, self.token_secret),
+                        )
+                        if asset_resp.status_code < 400:
+                            asset_data = asset_resp.json().get("data", {})
+                            playback_ids = asset_data.get("playback_ids", [])
+                            playback_id = playback_ids[0]["id"] if playback_ids else asset_id
+                            return {
+                                "status": "ready",
+                                "asset_id": asset_id,
+                                "playback_id": playback_id,
+                                "playback_url": f"https://stream.mux.com/{playback_id}.m3u8",
+                                "mp4_url": f"https://stream.mux.com/{playback_id}/high.mp4",
+                                "thumbnail_url": f"https://image.mux.com/{playback_id}/thumbnail.jpg",
+                                "is_sandbox": False,
+                            }
+                    return {"status": status, "is_sandbox": False}
+        except Exception as exc:
+            logger.warning("Mux status check failed: %s", exc)
+
+        return {"status": "waiting", "is_sandbox": False}
 
 
 class SocialPublisherTool:

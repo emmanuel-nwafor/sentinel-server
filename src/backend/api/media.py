@@ -35,24 +35,59 @@ async def get_r2_presigned_url(
 @router.post("/upload-signature")
 async def get_media_upload_signature(
     media_type: str = Query(..., description="'image' or 'video'"),
-    provider: Optional[str] = Query("r2", description="'r2', 'cloudinary', or 'mux'"),
+    provider: Optional[str] = Query(None, description="'auto', 'r2', 'cloudinary', or 'mux'"),
     filename: Optional[str] = Query(None),
     content_type: Optional[str] = Query(None),
     current_user: UserModel = Depends(get_current_user),
 ):
     """
     Unified client-to-cloud upload authorization endpoint.
-    Defaults to Cloudflare R2 with fallback support for Cloudinary & Mux.
+    - If provider is explicitly specified ('r2', 'mux', 'cloudinary'), uses that provider.
+    - If provider is None or 'auto':
+        * If Cloudflare R2 is configured (keys in .env): prioritizes Cloudflare R2 for all media.
+        * Otherwise (fallback mode for MUX & Cloudinary):
+            - 'video' -> MUX Direct Upload
+            - 'image' -> Cloudinary Upload Signature
     """
-    if provider == "r2":
+    if media_type not in ("image", "video"):
+        raise HTTPException(status_code=400, detail="Invalid media_type. Must be 'image' or 'video'.")
+
+    selected_provider = provider.lower() if provider else "auto"
+
+    if selected_provider == "r2":
         return r2_tool.generate_presigned_upload_url(
             media_type=media_type,
             filename=filename,
             content_type=content_type,
         )
-    elif media_type == "image":
-        return cloudinary_tool.generate_upload_signature()
-    elif media_type == "video":
+    elif selected_provider == "mux":
+        if media_type != "video":
+            raise HTTPException(status_code=400, detail="MUX provider is only for video uploads.")
         return await mux_tool.create_direct_upload_url()
+    elif selected_provider == "cloudinary":
+        return cloudinary_tool.generate_upload_signature()
     else:
-        raise HTTPException(status_code=400, detail="Invalid media_type. Must be 'image' or 'video'.")
+        # 'auto' mode:
+        # 1. Primary Engine: Cloudflare R2 if configured in .env
+        if r2_tool.is_configured:
+            return r2_tool.generate_presigned_upload_url(
+                media_type=media_type,
+                filename=filename,
+                content_type=content_type,
+            )
+        # 2. Active Fallback Engine: MUX for videos, Cloudinary for images
+        if media_type == "video":
+            return await mux_tool.create_direct_upload_url()
+        else:
+            return cloudinary_tool.generate_upload_signature()
+
+
+@router.get("/mux/status/{upload_id}")
+async def get_mux_upload_status(
+    upload_id: str,
+    current_user: UserModel = Depends(get_current_user),
+):
+    """
+    Check MUX video processing status and retrieve stream/mp4 playback URLs.
+    """
+    return await mux_tool.get_upload_status(upload_id)
