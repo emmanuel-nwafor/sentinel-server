@@ -1,5 +1,9 @@
 import os
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parents[3]
+_ENV_FILES = (_BACKEND_DIR / ".env", ".env")
 
 
 class Settings(BaseSettings):
@@ -73,6 +77,7 @@ class Settings(BaseSettings):
     X_REDIRECT_URI: str = "http://localhost:8000/api/v1/social/callback/x"
     X_API_KEY: str = ""
     X_API_SECRET: str = ""
+    X_BEARER_TOKEN: str = ""
     X_ACCESS_TOKEN: str = ""
     X_ACCESS_SECRET: str = ""
 
@@ -81,7 +86,7 @@ class Settings(BaseSettings):
     META_REDIRECT_URI: str = "http://localhost:8000/api/v1/social/callback/instagram"
     META_GRAPH_API_VERSION: str = "v22.0"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_ENV_FILES, env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()
