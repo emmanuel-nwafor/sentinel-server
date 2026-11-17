@@ -65,7 +65,7 @@ class GeminiVoiceTranscriber(IVoiceTranscriber):
 
         try:
             response = self._client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=settings.GEMINI_MODEL,
                 contents=[audio_part, prompt],
             )
             text = (response.text or "").strip()

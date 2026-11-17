@@ -29,7 +29,10 @@ class ContentOperatorAgent:
         brand_voice_prompt: str = None,
     ) -> GeneratedContentPlan:
         if self.client:
-            return await self._generate_with_llm(request, brand_voice_prompt)
+            try:
+                return await self._generate_with_llm(request, brand_voice_prompt)
+            except Exception as exc:
+                logger.warning("LLM generation failed (%s); using deterministic fallback.", exc)
         return self._generate_deterministic_fallback(request)
 
     async def _generate_with_llm(
@@ -74,19 +77,33 @@ class ContentOperatorAgent:
 
         prompt = "\n".join(prompt_parts)
 
-        response = self.client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json",
-                response_schema=GeneratedContentPlan,
-                temperature=0.7,
-            ),
-        )
+        models_to_try = [
+            settings.GEMINI_MODEL,
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash-lite",
+            "gemini-flash-latest",
+        ]
+        last_error = None
+        for model_name in dict.fromkeys(models_to_try):
+            try:
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        response_mime_type="application/json",
+                        response_schema=GeneratedContentPlan,
+                        temperature=0.7,
+                    ),
+                )
+                data = json.loads(response.text)
+                return GeneratedContentPlan(**data)
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Gemini model %s failed (%s); trying fallback...", model_name, exc)
+                continue
 
-        data = json.loads(response.text)
-        return GeneratedContentPlan(**data)
+        raise last_error or RuntimeError("All Gemini models failed.")
 
     def _generate_deterministic_fallback(self, request: ContentGenerationRequest) -> GeneratedContentPlan:
         clean_prompt = request.prompt.strip()

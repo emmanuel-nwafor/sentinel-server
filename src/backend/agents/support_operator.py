@@ -81,26 +81,30 @@ class SupportOperatorAgent:
             "Generate an optimal reply suggestion, identify the customer intent, and provide a recommended next action."
         )
 
-        try:
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    response_mime_type="application/json",
-                    response_schema=SupportReplySuggestionResponse,
-                    temperature=0.6,
-                ),
-            )
-            data = json.loads(response.text)
-            return SupportReplySuggestionResponse(**data)
-        except Exception as exc:
-            logger.warning("Gemini support operator error: %s. Falling back to rule-based suggestion.", exc)
-            return self._generate_fallback(
-                customer_name=customer_name,
-                platform=platform,
-                latest_message=latest_message,
-            )
+        models_to_try = [settings.GEMINI_MODEL, "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
+        for model_name in dict.fromkeys(models_to_try):
+            try:
+                response = self.client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        response_mime_type="application/json",
+                        response_schema=SupportReplySuggestionResponse,
+                        temperature=0.6,
+                    ),
+                )
+                data = json.loads(response.text)
+                return SupportReplySuggestionResponse(**data)
+            except Exception as exc:
+                logger.warning("Gemini support operator error on %s: %s", model_name, exc)
+                continue
+
+        return self._generate_fallback(
+            customer_name=customer_name,
+            platform=platform,
+            latest_message=latest_message,
+        )
 
     def _generate_fallback(
         self,
