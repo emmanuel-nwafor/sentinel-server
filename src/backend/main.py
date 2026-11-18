@@ -1,5 +1,7 @@
+import time
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import settings
 from backend.core.database import db_manager
@@ -28,6 +30,35 @@ app = FastAPI(
     description="Dispatch AI Operations Platform - Unified Python Backend (PostgreSQL + Async SQLAlchemy 2.0)",
     lifespan=lifespan,
 )
+
+logger = logging.getLogger("dispatch.http")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    method = request.method
+    path = request.url.path
+    query = str(request.url.query)
+    url_display = f"{path}?{query}" if query else path
+    client_ip = request.client.host if request.client else "unknown"
+
+    logger.info(f"➡️ [HTTP REQ] {method} {url_display} (Client: {client_ip})")
+
+    try:
+        response = await call_next(request)
+        duration_ms = (time.time() - start_time) * 1000
+        status_code = response.status_code
+
+        log_fn = logger.info if status_code < 400 else logger.warning if status_code < 500 else logger.error
+        log_fn(f"⬅️ [HTTP RES] {method} {url_display} -> Status {status_code} ({duration_ms:.1f}ms)")
+        return response
+    except Exception as exc:
+        duration_ms = (time.time() - start_time) * 1000
+        logger.error(f"❌ [HTTP ERR] {method} {url_display} -> Exception: {exc} ({duration_ms:.1f}ms)", exc_info=True)
+        raise exc
+
 
 # CORS
 app.add_middleware(
