@@ -10,6 +10,7 @@ from backend.api.social import router as social_router
 from backend.api.inbox import router as inbox_router
 from backend.api.premium import router as premium_router
 from backend.api.streaks import router as streaks_router
+from backend.api.admin import router as admin_router
 
 
 @asynccontextmanager
@@ -45,6 +46,7 @@ app.include_router(social_router, prefix="/api/v1")
 app.include_router(inbox_router, prefix="/api/v1")
 app.include_router(premium_router, prefix="/api/v1")
 app.include_router(streaks_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
 
 
 @app.get("/health")
