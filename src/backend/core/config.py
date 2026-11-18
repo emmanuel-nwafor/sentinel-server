@@ -66,16 +66,20 @@ class Settings(BaseSettings):
     # Social Login & Publishing OAuth App Credentials (app-level keys, not user tokens)
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/oauth/google/callback"
+    GOOGLE_REDIRECT_URI: str = (
+        "https://dispatch-6mlh.onrender.com/api/v1/auth/oauth/google/callback"
+    )
 
     LINKEDIN_CLIENT_ID: str = ""
     LINKEDIN_CLIENT_SECRET: str = ""
-    LINKEDIN_REDIRECT_URI: str = "http://localhost:8000/api/v1/social/callback/linkedin"
+    LINKEDIN_REDIRECT_URI: str = (
+        "https://dispatch-6mlh.onrender.com/api/v1/social/callback/linkedin"
+    )
     LINKEDIN_API_VERSION: str = "202501"
 
     X_CLIENT_ID: str = ""
     X_CLIENT_SECRET: str = ""
-    X_REDIRECT_URI: str = "http://localhost:8000/api/v1/social/callback/x"
+    X_REDIRECT_URI: str = "https://dispatch-6mlh.onrender.com/api/v1/social/callback/x"
     X_API_KEY: str = ""
     X_API_SECRET: str = ""
     X_BEARER_TOKEN: str = ""
@@ -84,7 +88,10 @@ class Settings(BaseSettings):
 
     META_APP_ID: str = ""
     META_APP_SECRET: str = ""
-    META_REDIRECT_URI: str = "http://localhost:8000/api/v1/social/callback/instagram"
+    META_CONFIG_ID: str = ""
+    META_REDIRECT_URI: str = (
+        "https://dispatch-6mlh.onrender.com/api/v1/social/callback/instagram"
+    )
     META_GRAPH_API_VERSION: str = "v22.0"
 
     model_config = SettingsConfigDict(env_file=_ENV_FILES, env_file_encoding="utf-8", extra="ignore")

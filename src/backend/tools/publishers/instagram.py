@@ -37,13 +37,16 @@ class InstagramPublisher(BaseSocialPublisher):
         return bool(settings.META_APP_ID and settings.META_APP_SECRET)
 
     def build_authorization_url(self, state: str, redirect_uri: Optional[str] = None) -> str:
-        params = {
+        params: Dict[str, Any] = {
             "client_id": settings.META_APP_ID or "DEMO_META_APP_ID",
             "redirect_uri": redirect_uri or settings.META_REDIRECT_URI,
             "state": state,
-            "scope": ",".join(self.DEFAULT_SCOPES),
             "response_type": "code",
         }
+        if settings.META_CONFIG_ID:
+            params["config_id"] = settings.META_CONFIG_ID
+        else:
+            params["scope"] = ",".join(self.DEFAULT_SCOPES)
         return f"https://www.facebook.com/{settings.META_GRAPH_API_VERSION}/dialog/oauth?{urlencode(params)}"
 
     async def exchange_code_for_tokens(
