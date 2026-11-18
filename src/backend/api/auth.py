@@ -83,7 +83,7 @@ async def register(request: RegisterRequest, uow: IUnitOfWork = Depends(get_uow)
             )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Account already registered and awaiting OTP verification. Call /auth/resend-otp.",
+            detail="Account already registered and awaiting OTP verification.",
         )
 
     new_user = UserModel(
