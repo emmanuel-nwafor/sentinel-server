@@ -137,7 +137,7 @@ class LinkedInPublisher(BaseSocialPublisher):
             )
 
     def _rest_headers(self, access_token: str, version: Optional[str] = None) -> Dict[str, str]:
-        v = version if version is not None else (settings.LINKEDIN_API_VERSION or "202411")
+        v = version if version is not None else (settings.LINKEDIN_API_VERSION or "202611")
         headers = {
             "Authorization": f"Bearer {access_token}",
             "X-Restli-Protocol-Version": "2.0.0",
@@ -145,7 +145,6 @@ class LinkedInPublisher(BaseSocialPublisher):
         }
         if v:
             cleaned_v = v.strip()
-            # If 8-digit date string like 20250101 was configured, convert to 6-digit YYYYMM
             if len(cleaned_v) > 6:
                 cleaned_v = cleaned_v[:6]
             headers["LinkedIn-Version"] = cleaned_v
@@ -230,8 +229,22 @@ class LinkedInPublisher(BaseSocialPublisher):
             "isReshareDisabledByAuthor": False,
         }
 
-        # Try configured version first, then fallback to active releases if 426 NONEXISTENT_VERSION occurs
-        candidate_versions = [None, "202411", "202410", "202409", "202408", "202405", "202401", ""]
+        # Dynamically compute rolling 14-month active LinkedIn versions (YYYYMM)
+        now = datetime.now(timezone.utc)
+        candidate_versions: List[str] = []
+        if settings.LINKEDIN_API_VERSION:
+            cleaned = settings.LINKEDIN_API_VERSION.strip()[:6]
+            candidate_versions.append(cleaned)
+        for i in range(14):
+            y = now.year
+            m = now.month - i
+            while m <= 0:
+                m += 12
+                y -= 1
+            ver_str = f"{y:04d}{m:02d}"
+            if ver_str not in candidate_versions:
+                candidate_versions.append(ver_str)
+
         last_error = None
 
         async with httpx.AsyncClient(timeout=30.0) as client:

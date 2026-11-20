@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     LINKEDIN_REDIRECT_URI: str = (
         "https://dispatch-6mlh.onrender.com/api/v1/social/callback/linkedin"
     )
-    LINKEDIN_API_VERSION: str = "202501"
+    LINKEDIN_API_VERSION: str = "202611"
 
     X_CLIENT_ID: str = ""
     X_CLIENT_SECRET: str = ""
