@@ -2,10 +2,12 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from backend.core.config import settings
 from backend.core.security import (
     create_oauth_state_token,
     verify_oauth_state_token,
+    inspect_oauth_state_token,
     token_cipher,
 )
 from backend.models.social_account import SocialAccountModel, SocialPlatform
@@ -138,31 +140,205 @@ async def exchange_oauth_callback(
     return _serialize_social_account(account)
 
 
-@router.get("/callback/{platform}", response_model=SocialAccountResponse)
+def _render_oauth_callback_html(
+    platform_name: str,
+    status: str,
+    message: str,
+    deep_link: str = "dispatch://auth/callback",
+) -> HTMLResponse:
+    color = (
+        "#0A66C2"
+        if "linkedin" in platform_name.lower()
+        else "#111418"
+        if "x" in platform_name.lower()
+        else "#E1306C"
+    )
+    is_ok = status == "success"
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sentinel — {platform_name.title()} Connection</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #090a0f;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+    }}
+    .card {{
+      background: #141720;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 40px 24px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }}
+    .icon {{
+      width: 64px;
+      height: 64px;
+      border-radius: 32px;
+      background: {color};
+      color: #ffffff;
+      font-size: 28px;
+      line-height: 64px;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }}
+    h1 {{
+      font-size: 20px;
+      margin: 0 0 10px;
+      font-weight: 700;
+    }}
+    p {{
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.5;
+      margin: 0 0 28px;
+    }}
+    .btn {{
+      display: inline-block;
+      background: #1d9bf0;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 14px 28px;
+      border-radius: 14px;
+      text-decoration: none;
+    }}
+  </style>
+  <script>
+    setTimeout(function() {{
+      window.location.href = "{deep_link}";
+    }}, 400);
+  </script>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">{'✓' if is_ok else '✕'}</div>
+    <h1>{platform_name.title()} {'Connected!' if is_ok else 'Connection Failed'}</h1>
+    <p>{message}</p>
+    <a href="{deep_link}" class="btn">Return to Sentinel</a>
+  </div>
+</body>
+</html>"""
+    return HTMLResponse(content=html, status_code=200 if is_ok else 400)
+
+
+@router.get("/callback/{platform}")
 async def browser_oauth_callback(
-    platform: SocialPlatform,
-    code: str = Query(...),
-    state: str = Query(...),
+    platform: str,
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    error_description: Optional[str] = Query(None),
     uow: IUnitOfWork = Depends(get_uow),
 ):
-    """Browser redirect OAuth callback using the signed state parameter to identify the user."""
-    state_user_id = verify_oauth_state_token(state, platform.value)
-    if not state_user_id:
-        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state token.")
+    """
+    Browser redirect OAuth callback. Exchanges code, updates database,
+    and returns an HTML page that triggers deep linking back to the mobile app.
+    """
+    platform_name = platform.title()
+    if error or not code or not state:
+        err_msg = error_description or error or "Authorization code or state was missing."
+        return _render_oauth_callback_html(
+            platform_name=platform_name,
+            status="error",
+            message=f"Connection was cancelled or rejected by {platform_name}: {err_msg}",
+            deep_link="dispatch://auth/callback?status=cancelled",
+        )
+
+    # Inspect state token
+    state_info = inspect_oauth_state_token(state)
+    if not state_info:
+        return _render_oauth_callback_html(
+            platform_name=platform_name,
+            status="error",
+            message="Your connection session expired or is invalid. Please return to Sentinel and try again.",
+            deep_link="dispatch://auth/callback?status=error",
+        )
+
+    user_id_str = state_info.get("sub")
+    try:
+        user_uuid = uuid.UUID(user_id_str)
+    except (ValueError, TypeError):
+        return _render_oauth_callback_html(
+            platform_name=platform_name,
+            status="error",
+            message="Malformed user reference in OAuth session.",
+            deep_link="dispatch://auth/callback?status=error",
+        )
+
+    # Resolve platform safely
+    try:
+        resolved_platform = SocialPlatform(platform.lower())
+    except ValueError:
+        return _render_oauth_callback_html(
+            platform_name=platform_name,
+            status="error",
+            message=f"Unsupported platform '{platform}'.",
+            deep_link="dispatch://auth/callback?status=error",
+        )
 
     try:
-        user_uuid = uuid.UUID(state_user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Malformed user reference in OAuth state.")
+        account = await _persist_oauth_bundle(
+            uow=uow,
+            user_id=user_uuid,
+            platform=resolved_platform,
+            code=code,
+            redirect_uri=None,
+        )
+        return _render_oauth_callback_html(
+            platform_name=resolved_platform.value.title(),
+            status="success",
+            message=f"Your {resolved_platform.value.title()} account '{account.account_name}' is now linked to Sentinel.",
+            deep_link=f"dispatch://auth/callback?status=success&platform={resolved_platform.value}&account={account.account_name}",
+        )
+    except Exception as exc:
+        return _render_oauth_callback_html(
+            platform_name=resolved_platform.value.title(),
+            status="error",
+            message=f"Failed to complete token exchange: {str(exc)}",
+            deep_link=f"dispatch://auth/callback?status=error&error={str(exc)}",
+        )
 
-    account = await _persist_oauth_bundle(
-        uow=uow,
-        user_id=user_uuid,
-        platform=platform,
+
+@router.get("/callback")
+async def browser_oauth_callback_query(
+    platform: Optional[str] = Query(None),
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    error_description: Optional[str] = Query(None),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """Universal query-based callback handler (e.g. /api/v1/social/callback?code=...&state=...)"""
+    resolved_platform = platform
+    if not resolved_platform and state:
+        state_info = inspect_oauth_state_token(state)
+        if state_info:
+            state_p = state_info.get("platform", "")
+            resolved_platform = state_p.replace("login:", "")
+    return await browser_oauth_callback(
+        platform=resolved_platform or "linkedin",
         code=code,
-        redirect_uri=None,
+        state=state,
+        error=error,
+        error_description=error_description,
+        uow=uow,
     )
-    return _serialize_social_account(account)
 
 
 @router.post(

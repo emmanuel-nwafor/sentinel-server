@@ -3,6 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from backend.core.config import settings
 from backend.core.database import db_manager
 from backend.api.auth import router as auth_router
@@ -78,6 +79,22 @@ app.include_router(inbox_router, prefix="/api/v1")
 app.include_router(premium_router, prefix="/api/v1")
 app.include_router(streaks_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+
+
+# Universal OAuth callback aliases to prevent 404 "Not Found" errors across provider redirects
+@app.get("/auth/callback")
+@app.get("/api/v1/auth/callback")
+async def alias_auth_callback(request: Request):
+    query = str(request.url.query)
+    target = f"/api/v1/social/callback?{query}" if query else "/api/v1/social/callback"
+    return RedirectResponse(url=target, status_code=307)
+
+
+@app.get("/social/callback/{platform}")
+async def alias_social_callback_platform(platform: str, request: Request):
+    query = str(request.url.query)
+    target = f"/api/v1/social/callback/{platform}?{query}" if query else f"/api/v1/social/callback/{platform}"
+    return RedirectResponse(url=target, status_code=307)
 
 
 @app.get("/health")

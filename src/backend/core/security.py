@@ -56,6 +56,14 @@ def verify_oauth_state_token(state_token: str, expected_platform: str) -> Option
     return payload.get("sub")
 
 
+def inspect_oauth_state_token(state_token: str) -> Optional[dict]:
+    """Inspect and decode signed OAuth state token to dynamically identify platform and user."""
+    payload = decode_access_token(state_token)
+    if not payload or payload.get("purpose") != "oauth_state":
+        return None
+    return payload
+
+
 class TokenCipher:
     """
     Symmetric Fernet cipher for encrypting OAuth access/refresh tokens at rest in PostgreSQL.
