@@ -97,6 +97,21 @@ async def alias_social_callback_platform(platform: str, request: Request):
     return RedirectResponse(url=target, status_code=307)
 
 
+@app.get("/")
+async def root_endpoint(request: Request):
+    query = str(request.url.query)
+    # If OAuth provider redirects to root with code and state, forward to callback handler
+    if "code=" in query and "state=" in query:
+        return RedirectResponse(url=f"/api/v1/social/callback?{query}", status_code=307)
+    return {
+        "status": "healthy",
+        "service": settings.PROJECT_NAME,
+        "database": "PostgreSQL (Async SQLAlchemy 2.0)",
+        "version": settings.VERSION,
+        "environment": settings.ENVIRONMENT,
+    }
+
+
 @app.get("/health")
 async def health_check():
     return {
