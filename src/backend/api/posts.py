@@ -330,13 +330,17 @@ async def create_manual_post(
             "hashtags": request.hashtags or [],
         }
 
-    post_status = PostStatus.SCHEDULED if request.is_scheduled else PostStatus.DRAFT
+    target_platforms = [
+        SocialPlatform(p.lower())
+        for p in request.platforms
+        if p.lower() in ("linkedin", "x", "instagram")
+    ]
 
     new_post = PostModel(
         id=post_id,
         user_id=current_user.id,
         workspace=request.workspace.value,
-        status=post_status.value,
+        status=PostStatus.SCHEDULED.value if request.is_scheduled else PostStatus.PUBLISHING.value,
         original_prompt=request.content,
         linkedin_variant=linkedin_variant,
         x_variant=x_variant,
@@ -353,6 +357,29 @@ async def create_manual_post(
 
     await uow.posts.create(new_post)
     await uow.commit()
+
+    # If posting immediately (not scheduled), dispatch live across target social channels now
+    if not request.is_scheduled and target_platforms:
+        final_status, results = await publishing_service.publish_post(
+            uow=uow,
+            user_id=current_user.id,
+            post=new_post,
+            target_platforms=target_platforms,
+        )
+        new_post.publish_results = results
+        new_post.status = final_status.value
+        now = datetime.now(timezone.utc)
+        if final_status in (PostStatus.PUBLISHED, PostStatus.PARTIALLY_PUBLISHED):
+            new_post.published_at = now
+            new_post.failure_reason = None
+        else:
+            errors = [
+                f"{plat}: {res.get('error')}"
+                for plat, res in results.items()
+                if not res.get("success") and res.get("error")
+            ]
+            new_post.failure_reason = "; ".join(errors) if errors else "Publishing failed."
+        await uow.commit()
 
     return serialize_post_model(new_post)
 
