@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from google import genai
 from google.genai import types
 from backend.core.config import settings
@@ -10,6 +11,8 @@ from backend.schemas.content import (
     XPostVariant,
     InstagramPostVariant,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ContentOperatorAgent:
@@ -78,10 +81,12 @@ class ContentOperatorAgent:
         prompt = "\n".join(prompt_parts)
 
         models_to_try = [
-            settings.GEMINI_MODEL,
-            "gemini-3.1-flash-lite",
-            "gemini-3.5-flash-lite",
+            settings.GEMINI_MODEL or "gemini-3.8-flash",
+            "gemini-3.8-flash",
             "gemini-flash-latest",
+            "gemini-flash-lite-latest",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-pro",
         ]
         last_error = None
         for model_name in dict.fromkeys(models_to_try):

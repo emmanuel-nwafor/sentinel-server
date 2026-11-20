@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # LLM Settings
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
+    GEMINI_MODEL: str = "gemini-3.8-flash"
     OPENAI_API_KEY: str = ""
 
     # Monetization & Premium Feature Flags
