@@ -360,26 +360,36 @@ async def create_manual_post(
 
     # If posting immediately (not scheduled), dispatch live across target social channels now
     if not request.is_scheduled and target_platforms:
-        final_status, results = await publishing_service.publish_post(
-            uow=uow,
-            user_id=current_user.id,
-            post=new_post,
-            target_platforms=target_platforms,
-        )
-        new_post.publish_results = results
-        new_post.status = final_status.value
-        now = datetime.now(timezone.utc)
-        if final_status in (PostStatus.PUBLISHED, PostStatus.PARTIALLY_PUBLISHED):
-            new_post.published_at = now
-            new_post.failure_reason = None
-        else:
-            errors = [
-                f"{plat}: {res.get('error')}"
-                for plat, res in results.items()
-                if not res.get("success") and res.get("error")
-            ]
-            new_post.failure_reason = "; ".join(errors) if errors else "Publishing failed."
-        await uow.commit()
+        try:
+            final_status, results = await publishing_service.publish_post(
+                uow=uow,
+                user_id=current_user.id,
+                post=new_post,
+                target_platforms=target_platforms,
+            )
+            new_post.publish_results = results
+            new_post.status = final_status.value
+            now = datetime.now(timezone.utc)
+            if final_status in (PostStatus.PUBLISHED, PostStatus.PARTIALLY_PUBLISHED):
+                new_post.published_at = now
+                new_post.failure_reason = None
+            else:
+                errors = [
+                    f"{plat}: {res.get('error')}"
+                    for plat, res in results.items()
+                    if not res.get("success") and res.get("error")
+                ]
+                new_post.failure_reason = "; ".join(errors) if errors else "Publishing failed."
+            await uow.commit()
+        except Exception as pub_err:
+            import logging
+            logging.getLogger(__name__).exception("Failed during live social publishing: %s", pub_err)
+            new_post.status = PostStatus.FAILED.value
+            new_post.failure_reason = f"Publishing error: {str(pub_err)}"
+            try:
+                await uow.commit()
+            except Exception:
+                pass
 
     return serialize_post_model(new_post)
 

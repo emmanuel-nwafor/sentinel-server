@@ -96,6 +96,37 @@ class LinkedInPublisher(BaseSocialPublisher):
                 scopes=self.DEFAULT_SCOPES,
             )
 
+    async def refresh_access_token(self, refresh_token: str) -> OAuthTokenBundle:
+        """Exchange refresh token for fresh LinkedIn access token."""
+        if not self.is_oauth_configured():
+            raise SocialPublishError("LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET required.")
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            token_resp = await client.post(
+                self.OAUTH_TOKEN_URL,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": settings.LINKEDIN_CLIENT_ID,
+                    "client_secret": settings.LINKEDIN_CLIENT_SECRET,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            if token_resp.status_code >= 400:
+                raise SocialPublishError(
+                    f"LinkedIn token refresh failed ({token_resp.status_code}): {token_resp.text}"
+                )
+
+            token_data = token_resp.json()
+            return OAuthTokenBundle(
+                access_token=token_data["access_token"],
+                refresh_token=token_data.get("refresh_token") or refresh_token,
+                expires_in=token_data.get("expires_in"),
+                platform_account_id="",
+                account_name="",
+                scopes=self.DEFAULT_SCOPES,
+            )
+
     def validate_content(self, text: str, media: Optional[Dict[str, Any]] = None) -> None:
         cleaned = (text or "").strip()
         if not cleaned:

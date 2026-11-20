@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional, Tuple
+from datetime import datetime, timezone, timedelta
 import uuid
 from backend.core.security import TokenCipher, token_cipher
 from backend.models.post import PostModel
@@ -85,14 +86,60 @@ class SocialPublishingService:
                 continue
 
             try:
+                # 1. Proactive Token Refresh if expired or near expiration (< 60s)
+                now = datetime.now(timezone.utc)
+                if (
+                    account.token_expires_at
+                    and account.token_expires_at <= now + timedelta(seconds=60)
+                    and account.encrypted_refresh_token
+                ):
+                    try:
+                        publisher = PublisherFactory.get_publisher(platform)
+                        if hasattr(publisher, "refresh_access_token"):
+                            raw_refresh = self._cipher.decrypt(account.encrypted_refresh_token)
+                            bundle = await publisher.refresh_access_token(raw_refresh)
+                            account.encrypted_access_token = self._cipher.encrypt(bundle.access_token)
+                            if bundle.refresh_token:
+                                account.encrypted_refresh_token = self._cipher.encrypt(bundle.refresh_token)
+                            if bundle.expires_in:
+                                account.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=bundle.expires_in)
+                            await uow.commit()
+                    except Exception as refresh_err:
+                        pass
+
                 access_token = self._cipher.decrypt(account.encrypted_access_token)
                 publisher = PublisherFactory.get_publisher(platform)
-                result = await publisher.publish(
-                    account=account,
-                    access_token=access_token,
-                    text=text,
-                    media=post.media,
-                )
+
+                # 2. Attempt publishing
+                try:
+                    result = await publisher.publish(
+                        account=account,
+                        access_token=access_token,
+                        text=text,
+                        media=post.media,
+                    )
+                except SocialPublishError as pub_err:
+                    # 3. Reactive token refresh on 401 Unauthorized
+                    err_str = str(pub_err).lower()
+                    if ("401" in err_str or "unauthorized" in err_str) and account.encrypted_refresh_token and hasattr(publisher, "refresh_access_token"):
+                        raw_refresh = self._cipher.decrypt(account.encrypted_refresh_token)
+                        bundle = await publisher.refresh_access_token(raw_refresh)
+                        account.encrypted_access_token = self._cipher.encrypt(bundle.access_token)
+                        if bundle.refresh_token:
+                            account.encrypted_refresh_token = self._cipher.encrypt(bundle.refresh_token)
+                        if bundle.expires_in:
+                            account.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=bundle.expires_in)
+                        await uow.commit()
+                        fresh_access_token = bundle.access_token
+                        result = await publisher.publish(
+                            account=account,
+                            access_token=fresh_access_token,
+                            text=text,
+                            media=post.media,
+                        )
+                    else:
+                        raise pub_err
+
                 results[platform.value] = result.model_dump(mode="json")
                 if result.success:
                     success_count += 1

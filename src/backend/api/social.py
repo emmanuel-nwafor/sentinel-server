@@ -292,13 +292,22 @@ async def browser_oauth_callback(
             deep_link="dispatch://auth/callback?status=error",
         )
 
+    # Explicitly pass platform's canonical redirect URI for strict matching
+    target_redirect = None
+    if resolved_platform == SocialPlatform.LINKEDIN:
+        target_redirect = settings.LINKEDIN_REDIRECT_URI
+    elif resolved_platform == SocialPlatform.X:
+        target_redirect = settings.X_REDIRECT_URI
+    elif resolved_platform == SocialPlatform.INSTAGRAM:
+        target_redirect = settings.META_REDIRECT_URI
+
     try:
         account = await _persist_oauth_bundle(
             uow=uow,
             user_id=user_uuid,
             platform=resolved_platform,
             code=code,
-            redirect_uri=None,
+            redirect_uri=target_redirect,
         )
         return _render_oauth_callback_html(
             platform_name=resolved_platform.value.title(),
@@ -307,6 +316,21 @@ async def browser_oauth_callback(
             deep_link=f"dispatch://auth/callback?status=success&platform={resolved_platform.value}&account={account.account_name}",
         )
     except Exception as exc:
+        # If exchange failed (e.g. replay/expired code on reload), check if account is already connected
+        try:
+            existing = await uow.social_accounts.get_by_user_and_platform(
+                user_uuid, resolved_platform.value
+            )
+            if existing and existing.is_active:
+                return _render_oauth_callback_html(
+                    platform_name=resolved_platform.value.title(),
+                    status="success",
+                    message=f"Your {resolved_platform.value.title()} account '{existing.account_name}' is actively linked to Sentinel.",
+                    deep_link=f"dispatch://auth/callback?status=success&platform={resolved_platform.value}&account={existing.account_name}",
+                )
+        except Exception:
+            pass
+
         return _render_oauth_callback_html(
             platform_name=resolved_platform.value.title(),
             status="error",
