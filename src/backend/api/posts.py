@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, Form, UploadFile
 from backend.models.user import UserModel
 from backend.models.post import PostModel
+from backend.models.social_account import SocialPlatform
 from backend.unit_of_work.base import IUnitOfWork
 from backend.api.deps import get_uow, get_current_user
 from backend.schemas.content import (
@@ -66,6 +67,7 @@ def serialize_post_model(post: PostModel, user_id: Optional[uuid.UUID] = None) -
         instagram_hashtags=ig_dict.get("hashtags", []),
         media=post.media,
         publish_results=post.publish_results,
+        failure_reason=post.failure_reason,
         views_count=meta.get("views_count", 0),
         likes_count=meta.get("likes_count", 0),
         comments_count=meta.get("comments_count", len(meta.get("audience_comments", []))),

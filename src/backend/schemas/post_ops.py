@@ -100,6 +100,7 @@ class PostDetailResponse(BaseModel):
     instagram_hashtags: List[str] = Field(default_factory=list)
     media: Optional[MediaAsset] = None
     publish_results: Optional[Dict[str, Any]] = None
+    failure_reason: Optional[str] = None
     views_count: int = 0
     likes_count: int = 0
     comments_count: int = 0
