@@ -15,6 +15,7 @@ from backend.schemas.content import (
     PostStatus,
 )
 from backend.schemas.post_ops import (
+    CreateManualPostRequest,
     UpdatePostRequest,
     SchedulePostRequest,
     PostDetailResponse,
@@ -294,6 +295,66 @@ async def generate_post_from_voice(
         media=final_media,
         status=PostStatus.DRAFT,
     )
+
+
+@router.post("", response_model=PostDetailResponse, status_code=status.HTTP_201_CREATED)
+async def create_manual_post(
+    request: CreateManualPostRequest,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Creates and saves a manual user post to specified platforms without AI prompt generation.
+    """
+    post_id = uuid.uuid4()
+    platforms_lower = [p.lower() for p in request.platforms]
+
+    linkedin_variant = None
+    if "linkedin" in platforms_lower:
+        linkedin_variant = {
+            "formatted_text": request.content,
+            "hashtags": request.hashtags or [],
+        }
+
+    x_variant = None
+    if "x" in platforms_lower or "twitter" in platforms_lower:
+        x_variant = {
+            "formatted_text": request.content,
+            "hashtags": request.hashtags or [],
+        }
+
+    instagram_variant = None
+    if "instagram" in platforms_lower:
+        instagram_variant = {
+            "formatted_text": request.content,
+            "hashtags": request.hashtags or [],
+        }
+
+    post_status = PostStatus.SCHEDULED if request.is_scheduled else PostStatus.DRAFT
+
+    new_post = PostModel(
+        id=post_id,
+        user_id=current_user.id,
+        workspace=request.workspace.value,
+        status=post_status.value,
+        original_prompt=request.content,
+        linkedin_variant=linkedin_variant,
+        x_variant=x_variant,
+        instagram_variant=instagram_variant,
+        media=request.media.model_dump() if request.media else None,
+        scheduled_at=request.scheduled_at,
+        metadata_info={
+            "views_count": 0,
+            "likes_count": 0,
+            "comments_count": 0,
+            "audience_comments": [],
+        },
+    )
+
+    await uow.posts.create(new_post)
+    await uow.commit()
+
+    return serialize_post_model(new_post)
 
 
 @router.get("", response_model=List[PostDetailResponse])

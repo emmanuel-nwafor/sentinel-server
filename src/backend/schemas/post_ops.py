@@ -5,6 +5,16 @@ from backend.models.social_account import SocialPlatform
 from backend.schemas.content import MediaAsset, WorkspaceType, PostStatus
 
 
+class CreateManualPostRequest(BaseModel):
+    content: str
+    platforms: List[str] = Field(default_factory=lambda: ["x"])
+    hashtags: Optional[List[str]] = Field(default_factory=list)
+    media: Optional[MediaAsset] = None
+    workspace: WorkspaceType = WorkspaceType.CONTENT
+    is_scheduled: bool = False
+    scheduled_at: Optional[datetime] = None
+
+
 class UpdatePostRequest(BaseModel):
     linkedin_text: Optional[str] = None
     linkedin_hashtags: Optional[List[str]] = None
