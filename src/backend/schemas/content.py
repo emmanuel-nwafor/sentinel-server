@@ -99,3 +99,18 @@ class VoicePostGenerationResponse(BaseModel):
     plan: GeneratedContentPlan
     media: Optional[MediaAsset] = None
     status: PostStatus
+
+
+class CopilotChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, description="User query or command for Dispatch Copilot")
+    workspace: WorkspaceType = Field(default=WorkspaceType.CONTENT)
+    connected_platforms: List[str] = Field(default_factory=list)
+    brand_voice_id: Optional[str] = None
+
+
+class CopilotChatResponse(BaseModel):
+    type: Literal["advice", "plan"] = Field(description="Response type: strategic advice or actionable distribution plan")
+    reply: str = Field(description="Autonomous executive response or synthesis commentary")
+    plan: Optional[GeneratedContentPlan] = Field(None, description="Distribution plan if drafting was requested")
+    suggested_actions: List[str] = Field(default_factory=list, description="Interactive quick-action pills")
+

@@ -14,6 +14,8 @@ from backend.schemas.content import (
     VoicePostGenerationResponse,
     WorkspaceType,
     PostStatus,
+    CopilotChatRequest,
+    CopilotChatResponse,
 )
 from backend.schemas.post_ops import (
     CreateManualPostRequest,
@@ -80,6 +82,34 @@ def serialize_post_model(post: PostModel, user_id: Optional[uuid.UUID] = None) -
     )
 
 
+@router.post("/copilot", response_model=CopilotChatResponse)
+async def copilot_chat(
+    request: CopilotChatRequest,
+    current_user: UserModel = Depends(get_current_user),
+    uow: IUnitOfWork = Depends(get_uow),
+):
+    """
+    Autonomous Social Media Operations Copilot.
+    Provides real-time strategic advice, niche intelligence, algorithmic tactics,
+    and platform-native draft synthesis on explicit command.
+    """
+    brand_voice_prompt = None
+    if request.brand_voice_id:
+        try:
+            bv = await uow.brand_voices.get_by_id(uuid.UUID(request.brand_voice_id))
+            if bv and bv.user_id == current_user.id:
+                brand_voice_prompt = (
+                    f"Brand Persona: {bv.name}\n"
+                    f"Tone: {bv.tone}\n"
+                    f"Audience: {bv.target_audience}\n"
+                    f"Pillars: {', '.join(bv.key_pillars)}"
+                )
+        except Exception:
+            pass
+
+    return await agent.chat(request, brand_voice_prompt=brand_voice_prompt)
+
+
 @router.post("/generate", response_model=ContentGenerationResponse, status_code=status.HTTP_201_CREATED)
 async def generate_post(
     request: ContentGenerationRequest,
@@ -88,7 +118,7 @@ async def generate_post(
 ):
     """
     Generate tailored LinkedIn and X post drafts from a natural language prompt.
-    Saves state into PostgreSQL via Unit of Work / PostRepository.
+    Synthesizes the plan in-memory without saving uncommitted drafts to PostgreSQL.
     """
     # Resolve Brand Voice Persona if requested or user has a default persona
     brand_voice_prompt = None
@@ -127,43 +157,8 @@ async def generate_post(
     if not final_media and request.generate_image_prompt and plan.suggested_media_prompt:
         final_media = cloudinary_tool.create_placeholder_ai_asset(plan.suggested_media_prompt)
 
-    new_post = PostModel(
-        user_id=current_user.id,
-        workspace=request.workspace.value,
-        status=PostStatus.DRAFT.value,
-        original_prompt=request.prompt,
-        linkedin_variant={
-            "formatted_text": plan.linkedin.formatted_text,
-            "headline": plan.linkedin.headline,
-            "body": plan.linkedin.body,
-            "call_to_action": plan.linkedin.call_to_action,
-            "hashtags": plan.linkedin.hashtags,
-        },
-        x_variant={
-            "formatted_text": plan.x.formatted_text,
-            "text": plan.x.text,
-            "hashtags": plan.x.hashtags,
-        },
-        instagram_variant={
-            "formatted_text": plan.instagram.formatted_text,
-            "caption": plan.instagram.caption,
-            "call_to_action": plan.instagram.call_to_action,
-            "hashtags": plan.instagram.hashtags,
-            "media_guidance": plan.instagram.media_guidance,
-        },
-        media=final_media.model_dump() if final_media else None,
-        metadata_info={
-            "intent_summary": plan.intent_summary,
-            "rationale": plan.rationale,
-            "suggested_media_prompt": plan.suggested_media_prompt,
-        },
-    )
-
-    await uow.posts.create(new_post)
-    await uow.commit()
-
     return ContentGenerationResponse(
-        post_id=str(new_post.id),
+        post_id=str(uuid.uuid4()),
         plan=plan,
         media=final_media,
         status=PostStatus.DRAFT,
@@ -369,10 +364,7 @@ async def create_manual_post(
         },
     )
 
-    await uow.posts.create(new_post)
-    await uow.commit()
-
-    # If posting immediately (not scheduled), dispatch live across target social channels now
+    # If posting immediately (not scheduled), dispatch live across target social channels FIRST
     if not request.is_scheduled and target_platforms:
         try:
             final_status, results = await publishing_service.publish_post(
@@ -384,6 +376,7 @@ async def create_manual_post(
             new_post.publish_results = results
             new_post.status = final_status.value
             now = datetime.now(timezone.utc)
+
             if final_status in (PostStatus.PUBLISHED, PostStatus.PARTIALLY_PUBLISHED):
                 new_post.published_at = now
                 new_post.failure_reason = None
@@ -393,17 +386,23 @@ async def create_manual_post(
                     for plat, res in results.items()
                     if not res.get("success") and res.get("error")
                 ]
-                new_post.failure_reason = "; ".join(errors) if errors else "Publishing failed."
+                error_msg = "; ".join(errors) if errors else "Publishing failed on social channels."
+                # REJECT WITHOUT SAVING TO DATABASE
+                raise HTTPException(status_code=400, detail=f"Failed to publish: {error_msg}")
+
+            # Publishing succeeded! NOW persist record to PostgreSQL database:
+            await uow.posts.create(new_post)
             await uow.commit()
+        except HTTPException:
+            raise
         except Exception as pub_err:
             import logging
             logging.getLogger(__name__).exception("Failed during live social publishing: %s", pub_err)
-            new_post.status = PostStatus.FAILED.value
-            new_post.failure_reason = f"Publishing error: {str(pub_err)}"
-            try:
-                await uow.commit()
-            except Exception:
-                pass
+            raise HTTPException(status_code=400, detail=f"Publishing failed: {str(pub_err)}")
+    else:
+        # Scheduled post: persist to database with scheduled state
+        await uow.posts.create(new_post)
+        await uow.commit()
 
     return serialize_post_model(new_post)
 

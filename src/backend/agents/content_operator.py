@@ -10,6 +10,8 @@ from backend.schemas.content import (
     LinkedInPostVariant,
     XPostVariant,
     InstagramPostVariant,
+    CopilotChatRequest,
+    CopilotChatResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,6 +39,103 @@ class ContentOperatorAgent:
             except Exception as exc:
                 logger.warning("LLM generation failed (%s); using deterministic fallback.", exc)
         return self._generate_deterministic_fallback(request)
+
+    async def chat(
+        self,
+        request: CopilotChatRequest,
+        brand_voice_prompt: str = None,
+    ) -> CopilotChatResponse:
+        user_msg = request.message.strip()
+        user_msg_lower = user_msg.lower()
+
+        # Check if the prompt is an explicit command to draft/write a post or thread
+        draft_triggers = [
+            "draft", "write a post", "compose a post", "create a post", "craft a post",
+            "generate post", "write a tweet", "write a thread", "dispatch a post",
+            "make a post", "write post", "draft post", "announce our", "craft a",
+        ]
+        is_draft_request = any(t in user_msg_lower for t in draft_triggers) or len(user_msg) > 130
+
+        if is_draft_request:
+            gen_request = ContentGenerationRequest(
+                prompt=user_msg,
+                workspace=request.workspace,
+            )
+            plan = await self.execute(gen_request, brand_voice_prompt=brand_voice_prompt)
+            return CopilotChatResponse(
+                type="plan",
+                reply="I've crafted an omnichannel distribution plan optimized for your connected platforms. Review the variants below and dispatch live whenever you are ready.",
+                plan=plan,
+                suggested_actions=["⚡ Make Punchier (<280)", "🎯 Stronger Hook", "📊 Add Data/Metrics"],
+            )
+
+        # Autonomous Social Media Operator Reasoning & Advice
+        if self.client:
+            try:
+                system_instruction = """
+                You are the Dispatch Autonomous Social Operator. You are not a generic chatbot or simple draft tool;
+                you are an elite social operations partner for founders, software builders, and business creators on LinkedIn and 𝕏.
+
+                Your personality:
+                - Highly strategic, sharp, executive, and direct (like a top-tier Head of Growth & Communications).
+                - Grounded in modern algorithmic reality: explain why comment velocity in the first 60 minutes matters on LinkedIn,
+                  why external links kill organic reach (put links in comments), how dwell time works, and how to craft polarizing or high-signal 𝕏 hooks.
+                - When asked about niche topics, audience engagement, or strategy, provide 2 to 3 concise, punchy bullet points followed by a concrete next action.
+                - Keep total response under 200 words. Format with clean markdown bullets.
+                """
+                platforms_str = ", ".join(request.connected_platforms) if request.connected_platforms else "LinkedIn, 𝕏"
+                prompt = (
+                    f"Connected Channels: {platforms_str}\n"
+                    f"User Inquiry: {user_msg}\n"
+                )
+                if brand_voice_prompt:
+                    prompt += f"\nBrand Voice:\n{brand_voice_prompt}"
+
+                models_to_try = [
+                    settings.GEMINI_MODEL or "gemini-3.8-flash",
+                    "gemini-3.8-flash",
+                    "gemini-flash-latest",
+                    "gemini-flash-lite-latest",
+                ]
+                for model_name in dict.fromkeys(models_to_try):
+                    try:
+                        resp = self.client.models.generate_content(
+                            model=model_name,
+                            contents=prompt,
+                            config=types.GenerateContentConfig(
+                                system_instruction=system_instruction,
+                                temperature=0.6,
+                            ),
+                        )
+                        reply_text = resp.text.strip()
+                        return CopilotChatResponse(
+                            type="advice",
+                            reply=reply_text,
+                            plan=None,
+                            suggested_actions=[
+                                "Draft LinkedIn Post on this",
+                                "Draft 𝕏 Thread",
+                                "Optimize Reach Strategy",
+                            ],
+                        )
+                    except Exception as e:
+                        logger.warning("Gemini chat model %s failed: %s", model_name, e)
+            except Exception as e:
+                logger.warning("Gemini chat failed (%s); using fallback response.", e)
+
+        # High-signal fallback operator response
+        fallback_reply = (
+            f"Here is your strategic distribution breakdown for **{user_msg[:50]}**:\n\n"
+            f"• **LinkedIn**: Maximize dwell time by opening with a high-contrast dilemma before offering the solution. Keep links out of the main post.\n"
+            f"• **𝕏 (Twitter)**: Lead with a 1-sentence contrarian claim. Fast replies in the first 30 minutes boost algorithmic distribution.\n"
+            f"• **Next Move**: Shall I draft a platform-native post or thread on this topic for you?"
+        )
+        return CopilotChatResponse(
+            type="advice",
+            reply=fallback_reply,
+            plan=None,
+            suggested_actions=["Draft LinkedIn Post on this", "Draft 𝕏 Thread", "Schedule Multi-Platform"],
+        )
 
     async def _generate_with_llm(
         self,
