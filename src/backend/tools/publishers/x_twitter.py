@@ -157,6 +157,10 @@ class XPublisher(BaseSocialPublisher):
                 },
                 json={"text": text.strip()},
             )
+            if resp.status_code == 402:
+                raise SocialPublishError(
+                    "X API credits depleted (402 Payment Required). Your X Developer Project is set to 'Pay Per Use' with $0 balance. Please add credits at console.x.com or switch project tier."
+                )
             if resp.status_code >= 400:
                 raise SocialPublishError(
                     f"X publish failed ({resp.status_code}): {resp.text}"

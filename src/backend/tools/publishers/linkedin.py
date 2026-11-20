@@ -136,13 +136,20 @@ class LinkedInPublisher(BaseSocialPublisher):
                 f"LinkedIn post exceeds {self.MAX_POST_LENGTH} characters ({len(cleaned)} given)."
             )
 
-    def _rest_headers(self, access_token: str) -> Dict[str, str]:
-        return {
+    def _rest_headers(self, access_token: str, version: Optional[str] = None) -> Dict[str, str]:
+        v = version if version is not None else (settings.LINKEDIN_API_VERSION or "202411")
+        headers = {
             "Authorization": f"Bearer {access_token}",
-            "LinkedIn-Version": settings.LINKEDIN_API_VERSION,
             "X-Restli-Protocol-Version": "2.0.0",
             "Content-Type": "application/json",
         }
+        if v:
+            cleaned_v = v.strip()
+            # If 8-digit date string like 20250101 was configured, convert to 6-digit YYYYMM
+            if len(cleaned_v) > 6:
+                cleaned_v = cleaned_v[:6]
+            headers["LinkedIn-Version"] = cleaned_v
+        return headers
 
     async def _upload_image_asset(
         self,
@@ -223,6 +230,10 @@ class LinkedInPublisher(BaseSocialPublisher):
             "isReshareDisabledByAuthor": False,
         }
 
+        # Try configured version first, then fallback to active releases if 426 NONEXISTENT_VERSION occurs
+        candidate_versions = [None, "202411", "202410", "202409", "202408", "202405", "202401", ""]
+        last_error = None
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             if media and media.get("url"):
                 if media.get("type") == "image":
@@ -235,25 +246,34 @@ class LinkedInPublisher(BaseSocialPublisher):
                         "Live LinkedIn video upload requires multipart initialization; attach an image or use sandbox mode for video demos."
                     )
 
-            post_resp = await client.post(
-                self.POSTS_API_URL,
-                headers=self._rest_headers(access_token),
-                json=payload,
-            )
-            if post_resp.status_code >= 400:
-                raise SocialPublishError(
-                    f"LinkedIn post publish failed ({post_resp.status_code}): {post_resp.text}"
+            for ver in candidate_versions:
+                headers = self._rest_headers(access_token, version=ver)
+                post_resp = await client.post(
+                    self.POSTS_API_URL,
+                    headers=headers,
+                    json=payload,
                 )
+                if post_resp.status_code == 426 and "NONEXISTENT_VERSION" in post_resp.text:
+                    last_error = f"LinkedIn post publish failed (426): {post_resp.text}"
+                    continue
+                elif post_resp.status_code >= 400:
+                    raise SocialPublishError(
+                        f"LinkedIn post publish failed ({post_resp.status_code}): {post_resp.text}"
+                    )
+                else:
+                    # Successfully posted to LinkedIn!
+                    post_urn = post_resp.headers.get("x-restli-id") or f"urn:li:share:{self._timestamp_id('live')}"
+                    return PlatformPublishResult(
+                        platform=self.platform,
+                        success=True,
+                        remote_post_id=post_urn,
+                        post_url=f"https://www.linkedin.com/feed/update/{post_urn}/",
+                        is_sandbox=False,
+                        published_at=datetime.now(timezone.utc),
+                    )
 
-            post_urn = post_resp.headers.get("x-restli-id") or f"urn:li:share:{self._timestamp_id('live')}"
-            return PlatformPublishResult(
-                platform=self.platform,
-                success=True,
-                remote_post_id=post_urn,
-                post_url=f"https://www.linkedin.com/feed/update/{post_urn}/",
-                is_sandbox=False,
-                published_at=datetime.now(timezone.utc),
-            )
+            if last_error:
+                raise SocialPublishError(last_error)
 
     async def delete_post(
         self,
