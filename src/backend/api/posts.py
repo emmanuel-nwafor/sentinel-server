@@ -311,25 +311,37 @@ async def create_manual_post(
     post_id = uuid.uuid4()
     platforms_lower = [p.lower() for p in request.platforms]
 
+    # Extract any hashtags written in the text like #buildinpublic #startup
+    import re
+    inline_tags = re.findall(r"#\w+", request.content)
+    combined_tags = list(dict.fromkeys((request.hashtags or []) + inline_tags))
+    clean_tags = [t if t.startswith("#") else f"#{t}" for t in combined_tags if t.strip()]
+
+    # Ensure formatted text has hashtags attached at the end if not already in text
+    formatted_content = request.content.strip()
+    tags_to_append = [t for t in clean_tags if t.lower() not in formatted_content.lower()]
+    if tags_to_append:
+        formatted_content = f"{formatted_content}\n\n{' '.join(tags_to_append)}"
+
     linkedin_variant = None
     if "linkedin" in platforms_lower:
         linkedin_variant = {
-            "formatted_text": request.content,
-            "hashtags": request.hashtags or [],
+            "formatted_text": formatted_content,
+            "hashtags": clean_tags,
         }
 
     x_variant = None
     if "x" in platforms_lower or "twitter" in platforms_lower:
         x_variant = {
-            "formatted_text": request.content,
-            "hashtags": request.hashtags or [],
+            "formatted_text": formatted_content,
+            "hashtags": clean_tags,
         }
 
     instagram_variant = None
     if "instagram" in platforms_lower:
         instagram_variant = {
-            "formatted_text": request.content,
-            "hashtags": request.hashtags or [],
+            "formatted_text": formatted_content,
+            "hashtags": clean_tags,
         }
 
     target_platforms = [

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from pathlib import Path
+from typing import Optional, Dict, Any, List, Tuple
 from urllib.parse import urlencode
 import httpx
 from backend.core.config import settings
@@ -22,6 +23,7 @@ class LinkedInPublisher(BaseSocialPublisher):
     OAUTH_TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
     USERINFO_URL = "https://api.linkedin.com/v2/userinfo"
     IMAGES_API_URL = "https://api.linkedin.com/rest/images?action=initializeUpload"
+    VIDEOS_API_URL = "https://api.linkedin.com/rest/videos?action=initializeUpload"
     POSTS_API_URL = "https://api.linkedin.com/rest/posts"
     DEFAULT_SCOPES = ["openid", "profile", "email", "w_member_social"]
     MAX_POST_LENGTH = 3000
@@ -160,7 +162,7 @@ class LinkedInPublisher(BaseSocialPublisher):
         """
         LinkedIn 3-step media upload:
         1) Initialize upload slot to get uploadUrl + image URN.
-        2) Stream image bytes from Cloudinary URL.
+        2) Stream image bytes from storage/local disk.
         3) PUT binary payload directly to LinkedIn's uploadUrl.
         """
         init_resp = await client.post(
@@ -179,13 +181,21 @@ class LinkedInPublisher(BaseSocialPublisher):
         if not upload_url or not image_urn:
             raise SocialPublishError("LinkedIn image init response missing uploadUrl or image URN.")
 
-        image_bytes, content_type = await self._download_media_bytes(image_url)
+        # Check local file or download from URL
+        local_filename = image_url.split("/static/uploads/")[-1] if "/static/uploads/" in image_url else None
+        local_path = (Path("static/uploads") / local_filename) if local_filename else None
+        if local_path and local_path.exists():
+            image_bytes = local_path.read_bytes()
+            content_type = "image/png" if local_path.suffix.lower() == ".png" else "image/jpeg"
+        else:
+            image_bytes, content_type = await self._download_media_bytes(image_url)
+
         put_resp = await client.put(
             upload_url,
             content=image_bytes,
             headers={
                 "Authorization": f"Bearer {access_token}",
-                "Content-Type": content_type,
+                "Content-Type": content_type or "image/jpeg",
             },
         )
         if put_resp.status_code >= 400:
@@ -193,6 +203,60 @@ class LinkedInPublisher(BaseSocialPublisher):
                 f"LinkedIn binary image upload failed ({put_resp.status_code}): {put_resp.text}"
             )
         return image_urn
+
+    async def _upload_video_asset(
+        self,
+        client: httpx.AsyncClient,
+        access_token: str,
+        owner_urn: str,
+        video_url: str,
+    ) -> str:
+        """
+        LinkedIn 3-step video upload:
+        1) Initialize video upload slot via POST /rest/videos?action=initializeUpload.
+        2) Read video bytes from storage or local disk.
+        3) PUT binary video payload directly to LinkedIn's uploadUrl.
+        """
+        init_resp = await client.post(
+            self.VIDEOS_API_URL,
+            headers=self._rest_headers(access_token),
+            json={"initializeUploadRequest": {"owner": owner_urn}},
+        )
+        if init_resp.status_code >= 400:
+            raise SocialPublishError(
+                f"LinkedIn video upload init failed ({init_resp.status_code}): {init_resp.text}"
+            )
+
+        value = init_resp.json().get("value", {})
+        instructions = value.get("uploadInstructions", [])
+        video_urn = value.get("video")
+        if not instructions or not video_urn:
+            raise SocialPublishError("LinkedIn video init response missing uploadInstructions or video URN.")
+
+        upload_url = instructions[0].get("uploadUrl")
+
+        # Check local file or download from URL
+        local_filename = video_url.split("/static/uploads/")[-1] if "/static/uploads/" in video_url else None
+        local_path = (Path("static/uploads") / local_filename) if local_filename else None
+        if local_path and local_path.exists():
+            video_bytes = local_path.read_bytes()
+            content_type = "video/mp4"
+        else:
+            video_bytes, content_type = await self._download_media_bytes(video_url)
+
+        put_resp = await client.put(
+            upload_url,
+            content=video_bytes,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": content_type or "video/mp4",
+            },
+        )
+        if put_resp.status_code >= 400:
+            raise SocialPublishError(
+                f"LinkedIn binary video upload failed ({put_resp.status_code}): {put_resp.text}"
+            )
+        return video_urn
 
     async def publish(
         self,
@@ -247,17 +311,19 @@ class LinkedInPublisher(BaseSocialPublisher):
 
         last_error = None
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             if media and media.get("url"):
-                if media.get("type") == "image":
+                media_type = media.get("type", "image")
+                if media_type == "video":
+                    video_urn = await self._upload_video_asset(
+                        client, access_token, author_urn, media["url"]
+                    )
+                    payload["content"] = {"media": {"id": video_urn, "title": "Video Broadcast"}}
+                else:
                     image_urn = await self._upload_image_asset(
                         client, access_token, author_urn, media["url"]
                     )
-                    payload["content"] = {"media": {"id": image_urn}}
-                else:
-                    raise SocialPublishError(
-                        "Live LinkedIn video upload requires multipart initialization; attach an image or use sandbox mode for video demos."
-                    )
+                    payload["content"] = {"media": {"id": image_urn, "title": "Image Asset"}}
 
             for ver in candidate_versions:
                 headers = self._rest_headers(access_token, version=ver)

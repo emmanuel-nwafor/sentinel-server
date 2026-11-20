@@ -1,7 +1,9 @@
 import time
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from backend.core.config import settings
@@ -79,6 +81,10 @@ app.include_router(inbox_router, prefix="/api/v1")
 app.include_router(premium_router, prefix="/api/v1")
 app.include_router(streaks_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+
+# Mount Static Assets for Direct Media Uploads & Stream Serving
+Path("static/uploads").mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 # Universal OAuth callback aliases to prevent 404 "Not Found" errors across provider redirects

@@ -50,7 +50,26 @@ class SocialPublishingService:
             SocialPlatform.INSTAGRAM: post.instagram_variant,
         }
         variant = variant_map.get(platform) or {}
-        return variant.get("formatted_text")
+        text = (variant.get("formatted_text") or "").strip()
+        hashtags = variant.get("hashtags") or []
+
+        # If hashtags list has tags, ensure all are formatted and appended to text
+        if hashtags and isinstance(hashtags, list):
+            clean_tags = []
+            for tag in hashtags:
+                if not tag or not isinstance(tag, str):
+                    continue
+                t = tag.strip()
+                if not t:
+                    continue
+                clean_tags.append(t if t.startswith("#") else f"#{t}")
+
+            if clean_tags:
+                tags_to_append = [tag for tag in clean_tags if tag.lower() not in text.lower()]
+                if tags_to_append:
+                    text = f"{text}\n\n{' '.join(tags_to_append)}".strip()
+
+        return text or None
 
     async def publish_post(
         self,
