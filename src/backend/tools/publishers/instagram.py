@@ -44,8 +44,7 @@ class InstagramPublisher(BaseSocialPublisher):
         params: Dict[str, Any] = {
             "client_id": settings.META_APP_ID or "1650463666534776",
             "config_id": settings.META_CONFIG_ID or "1886402302343483",
-            "display": "popup",
-            "override_default_response_type": "true",
+            "display": "touch",
             "redirect_uri": target_redirect,
             "response_type": "code",
             "state": state,
