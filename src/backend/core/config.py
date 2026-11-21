@@ -94,6 +94,12 @@ class Settings(BaseSettings):
     )
     META_GRAPH_API_VERSION: str = "v21.0"
 
+    YOUTUBE_CLIENT_ID: str = ""
+    YOUTUBE_CLIENT_SECRET: str = ""
+    YOUTUBE_REDIRECT_URI: str = (
+        "https://dispatch-6mlh.onrender.com/api/v1/social/callback/youtube"
+    )
+
     model_config = SettingsConfigDict(env_file=_ENV_FILES, env_file_encoding="utf-8", extra="ignore")
 
 

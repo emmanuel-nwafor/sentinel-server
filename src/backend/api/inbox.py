@@ -135,7 +135,7 @@ async def send_inbox_reply(
 ):
     """
     Send an in-app reply directly back to the customer on Instagram/X/LinkedIn.
-    Uses connected social tokens to dispatch without leaving Sentinel.
+    Uses connected social tokens to dispatch without leaving Dispatch.
     """
     try:
         conv_uuid = uuid.UUID(conversation_id)
@@ -182,7 +182,7 @@ async def generate_ai_reply_suggestion(
     uow: IUnitOfWork = Depends(get_uow),
 ):
     """
-    Sentinel AI Support Co-Pilot:
+    Dispatch AI Support Co-Pilot:
     Analyzes conversation context and pre-drafts a polite, conversion-optimized reply.
     """
     try:

@@ -248,7 +248,7 @@ async def complete_social_login(
     uow: IUnitOfWork = Depends(get_uow),
 ):
     """
-    Exchange OAuth code, sign in or register the Sentinel user, and auto-connect
+    Exchange OAuth code, sign in or register the Dispatch user, and auto-connect
     LinkedIn / X publishing tokens in the same transaction.
     """
     if not oauth_login_service.verify_login_state(payload.state, provider):
@@ -294,7 +294,7 @@ async def sandbox_social_login(
 
     client = oauth_login_service.get_provider_client(provider)
     clean_slug = "".join(c.lower() if c.isalnum() else "_" for c in payload.name).strip("_") or "user"
-    resolved_email = payload.email or f"{clean_slug}_{provider.value}@sandbox.sentinel.local"
+    resolved_email = payload.email or f"{clean_slug}_{provider.value}@sandbox.dispatch.local"
     account_handle = (
         payload.handle
         if provider == OAuthLoginProvider.X

@@ -11,6 +11,7 @@ from backend.tools.publishers.base import ISocialPublisher, SocialPublishError
 from backend.tools.publishers.linkedin import LinkedInPublisher
 from backend.tools.publishers.x_twitter import XPublisher
 from backend.tools.publishers.instagram import InstagramPublisher
+from backend.tools.publishers.youtube import YouTubePublisher
 from backend.unit_of_work.base import IUnitOfWork
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class PublisherFactory:
         SocialPlatform.LINKEDIN: LinkedInPublisher(),
         SocialPlatform.X: XPublisher(),
         SocialPlatform.INSTAGRAM: InstagramPublisher(),
+        SocialPlatform.YOUTUBE: YouTubePublisher(),
     }
 
     @classmethod
@@ -51,6 +53,7 @@ class SocialPublishingService:
             SocialPlatform.LINKEDIN: post.linkedin_variant,
             SocialPlatform.X: post.x_variant,
             SocialPlatform.INSTAGRAM: post.instagram_variant,
+            SocialPlatform.YOUTUBE: post.linkedin_variant or post.x_variant,
         }
         variant = variant_map.get(platform) or {}
         text = (variant.get("formatted_text") or "").strip()

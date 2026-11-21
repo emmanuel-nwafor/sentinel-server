@@ -134,16 +134,32 @@ class ContentOperatorAgent:
                             properties={},
                         ),
                     ),
+                    types.FunctionDeclaration(
+                        name="get_linkedin_profile_details",
+                        description="Retrieve the user's detailed LinkedIn profile bio, headline, and currently showcased projects and portfolio. Use when the user asks about their LinkedIn bio, projects, or background.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={},
+                        ),
+                    ),
                 ]
             )
         ]
 
         system_instruction = f"""
-You are the Dispatch Autonomous Social Operator — an elite Head of Content and Technical Co-Pilot.
+You are the Dispatch Autonomous Social Operator — an elite Head of Content, System Architect, and Technical Co-Pilot.
 
 USER BACKGROUND MEMORY (RAG & PERSISTENT CONTEXT):
 - User Name: {user_name}
 - Professional Niche & Identity: {user_niche}
+- Verified LinkedIn Profile: Emmanuel Chinecherem (Handle: @emmanuel-chinecherem)
+- Verified 𝕏 Profile: E M S T A C K (Handle: @EMSTACK)
+- Verified Bio & Headline: Software Engineer & AI Automation Engineer | Distributed Systems & Scalable Architectures | AI Agentic Workflows & Tool-Calling Systems
+- Showcased Projects & Portfolio:
+  1. Dispatch (AI Social Operations Engine) — Autonomous multi-agent co-pilot with tool-calling reasoning, multi-platform content synthesis, and live publishing (LinkedIn, 𝕏, Instagram, YouTube).
+  2. Distributed High-Throughput Pipeline — Scalable event-driven streaming architecture leveraging Redis, asyncpg connection pooling, and database query latency optimization.
+  3. Autonomous Agentic Framework — Production LLM agent combining function calling, external tool invocations, and multimodal asset handling.
+  4. Mobile Cross-Platform Applications — React Native (Expo) apps with fluid micro-interactions, haptics, and FastAPI / PostgreSQL backends.
 - Core Topics: Distributed Systems, Scalable Architectures, AI Agents, Engineering Automation, Modern Full-Stack Development
 - Target Audience: Tech founders, senior software engineers, system architects, AI builders
 - Tone: High-conviction, opinionated, witty, charismatic, and technical with zero corporate buzzword fluff.
@@ -156,7 +172,8 @@ CORE OPERATING PRINCIPLES:
    - When the user asks to write, draft, synthesize, enhance, compose, or creates a post (or provides raw notes from the composer), invoke `draft_post_plan`.
    - When the user asks to publish or post directly to their live feeds, invoke `publish_post_to_social`.
    - When the user explicitly asks about their accounts, handles, or connection status, invoke `get_connected_accounts_info`.
-   - For technical questions (system design, architecture trade-offs, code, career, debate), respond conversationally as an elite technical co-pilot.
+   - When the user asks about their LinkedIn bio or showcased projects, invoke `get_linkedin_profile_details` (or answer with their verified profile and showcased projects).
+   - For technical questions (system design, architecture trade-offs, code, career, debate), respond conversationally as an elite technical co-pilot with wit and clarity.
 2. Background Memory:
    - You ALREADY know who the user is from USER BACKGROUND MEMORY. DO NOT recite or list their profile, niche, or handles unless they explicitly ask for it!
    - Every post you draft MUST reflect their real niche ({user_niche}) rather than generic business jargon.
@@ -227,12 +244,36 @@ CORE OPERATING PRINCIPLES:
                                 )
 
                             elif fn_name == "get_connected_accounts_info":
-                                reply_text = f"Here are your connected social accounts retrieved from Sentinel:\n\n{profiles_str}\n\nAll set and ready for autonomous dispatch! Would you like me to draft a post for one of these?"
+                                reply_text = f"Here are your connected social accounts retrieved from Dispatch:\n\n{profiles_str}\n\nAll set and ready for autonomous dispatch! Would you like me to draft a post for one of these?"
                                 return CopilotChatResponse(
                                     type="advice",
                                     reply=reply_text,
                                     plan=None,
                                     suggested_actions=["Draft a LinkedIn post", "Draft an 𝕏 thread", "How to boost reach this week?"],
+                                )
+
+                            elif fn_name == "get_linkedin_profile_details":
+                                reply_text = (
+                                    "Here is your verified LinkedIn profile overview and showcased projects:\n\n"
+                                    "• **Profile Name**: Emmanuel Chinecherem\n"
+                                    "• **Bio & Headline**: Software Engineer & AI Automation Engineer | Distributed Systems & Scalable Architectures | AI Agentic Workflows\n"
+                                    "• **Specialization**: High-throughput event streams, asyncpg connection pooling, autonomous LLM function calling, and multi-platform social systems.\n\n"
+                                    "**Currently Showcased Projects**:\n"
+                                    "1. **Dispatch (AI Social Operations Engine)** — Autonomous multi-agent co-pilot with tool-calling reasoning, multi-platform content synthesis, and live publishing (LinkedIn, 𝕏, Instagram, YouTube).\n"
+                                    "2. **Distributed High-Throughput Pipeline** — Scalable microservice event bus leveraging Redis, asyncpg connection pooling, and optimized DB sharding and query execution.\n"
+                                    "3. **Autonomous Tool-Calling Agent Framework** — Production agentic architecture combining multi-modal vision, dynamic function calling, and long-term memory retrieval.\n"
+                                    "4. **Mobile Cross-Platform Applications** — Production React Native (Expo) systems featuring 60fps haptics, gesture micro-interactions, and resilient FastAPI backends.\n\n"
+                                    "Would you like me to turn one of these showcase projects into a high-engagement thought leadership post for your LinkedIn network?"
+                                )
+                                return CopilotChatResponse(
+                                    type="advice",
+                                    reply=reply_text,
+                                    plan=None,
+                                    suggested_actions=[
+                                        "Draft a LinkedIn post on Dispatch",
+                                        "Write an 𝕏 thread on asyncpg & sharding",
+                                        "Optimize my bio headline",
+                                    ],
                                 )
 
                             elif fn_name == "publish_post_to_social":
@@ -280,7 +321,7 @@ CORE OPERATING PRINCIPLES:
         brand_voice_prompt: str = None,
     ) -> GeneratedContentPlan:
         system_instruction = """
-        You are the Sentinel Content Operator Agent for modern AI-driven businesses.
+        You are the Dispatch Content Operator Agent for modern AI-driven businesses.
         Your mission is to take user prompts and elevate them into high-performing,
         platform-native social posts.
 

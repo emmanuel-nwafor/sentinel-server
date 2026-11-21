@@ -97,7 +97,7 @@ async def list_connected_accounts(
     current_user: UserModel = Depends(get_current_user),
     uow: IUnitOfWork = Depends(get_uow),
 ):
-    """List all social accounts connected by the current user inside Sentinel with real-time profile pictures."""
+    """List all social accounts connected by the current user inside Dispatch with real-time profile pictures."""
     accounts = await uow.social_accounts.list_by_user(current_user.id)
     serialized: List[SocialAccountResponse] = []
     
@@ -136,7 +136,7 @@ async def start_oauth_connection(
 ):
     """
     Generate an OAuth 2.0 authorization URL and signed state token
-    for an in-app browser/modal consent flow inside Sentinel.
+    for an in-app browser/modal consent flow inside Dispatch.
     """
     publisher = PublisherFactory.get_publisher(platform)
     state = create_oauth_state_token(user_id=str(current_user.id), platform=platform.value)
@@ -200,7 +200,7 @@ def _render_oauth_callback_html(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sentinel — {platform_name.title()} Connection</title>
+  <title>Dispatch — {platform_name.title()} Connection</title>
   <style>
     body {{
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -271,7 +271,7 @@ def _render_oauth_callback_html(
     <div class="icon">{'✓' if is_ok else '✕'}</div>
     <h1>{platform_name.title()} {'Connected!' if is_ok else 'Connection Failed'}</h1>
     <p>{message}</p>
-    <a href="{deep_link}" class="btn">Return to Sentinel</a>
+    <a href="{deep_link}" class="btn">Return to Dispatch</a>
   </div>
 </body>
 </html>"""
@@ -307,7 +307,7 @@ async def browser_oauth_callback(
         return _render_oauth_callback_html(
             platform_name=platform_name,
             status="error",
-            message="Your connection session expired or is invalid. Please return to Sentinel and try again.",
+            message="Your connection session expired or is invalid. Please return to Dispatch and try again.",
             deep_link="dispatch://auth/callback?status=error",
         )
 
@@ -353,7 +353,7 @@ async def browser_oauth_callback(
         return _render_oauth_callback_html(
             platform_name=resolved_platform.value.title(),
             status="success",
-            message=f"Your {resolved_platform.value.title()} account '{account.account_name}' is now linked to Sentinel.",
+            message=f"Your {resolved_platform.value.title()} account '{account.account_name}' is now linked to Dispatch.",
             deep_link=f"dispatch://auth/callback?status=success&platform={resolved_platform.value}&account={account.account_name}",
         )
     except Exception as exc:
@@ -367,7 +367,7 @@ async def browser_oauth_callback(
                 return _render_oauth_callback_html(
                     platform_name=resolved_platform.value.title(),
                     status="success",
-                    message=f"Your {resolved_platform.value.title()} account '{existing.account_name}' is actively linked to Sentinel.",
+                    message=f"Your {resolved_platform.value.title()} account '{existing.account_name}' is actively linked to Dispatch.",
                     deep_link=f"dispatch://auth/callback?status=success&platform={resolved_platform.value}&account={existing.account_name}",
                 )
         except Exception:
@@ -454,7 +454,7 @@ async def disconnect_social_account(
     current_user: UserModel = Depends(get_current_user),
     uow: IUnitOfWork = Depends(get_uow),
 ):
-    """Disconnect a social platform from Sentinel."""
+    """Disconnect a social platform from Dispatch."""
     deleted = await uow.social_accounts.delete_by_user_and_platform(
         user_id=current_user.id,
         platform=platform.value,

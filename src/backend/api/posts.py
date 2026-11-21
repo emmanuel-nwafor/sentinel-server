@@ -122,10 +122,18 @@ async def copilot_chat(
         import logging
         logging.getLogger(__name__).warning("Failed to fetch user social accounts: %s", exc)
 
+    # Extract social identities if connected
+    linkedin_acc = next((sa for sa in profiles_info if sa["platform"] == "linkedin"), None)
+    x_acc = next((sa for sa in profiles_info if sa["platform"] == "x"), None)
+
     user_context = {
         "name": current_user.name or "Emmanuel Onyekachi",
         "email": current_user.email,
         "niche": "Software Engineer, AI Engineer, AI Automation & Scalable Architecture",
+        "linkedin_name": linkedin_acc["account_name"] if linkedin_acc else "Emmanuel Chinecherem",
+        "linkedin_handle": linkedin_acc["account_handle"] if linkedin_acc else "@emmanuel-chinecherem",
+        "x_name": x_acc["account_name"] if x_acc else "E M S T A C K",
+        "x_handle": x_acc["account_handle"] if x_acc else "@EMSTACK",
     }
 
     res = await agent.chat(
@@ -458,7 +466,7 @@ async def create_manual_post(
     target_platforms = [
         SocialPlatform(p.lower())
         for p in request.platforms
-        if p.lower() in ("linkedin", "x", "instagram")
+        if p.lower() in ("linkedin", "x", "instagram", "youtube")
     ]
 
     new_post = PostModel(
