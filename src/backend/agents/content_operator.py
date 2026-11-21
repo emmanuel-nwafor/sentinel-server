@@ -70,30 +70,65 @@ class ContentOperatorAgent:
         self,
         request: CopilotChatRequest,
         brand_voice_prompt: str = None,
+        connected_profiles_info: list = None,
     ) -> CopilotChatResponse:
         user_msg = request.message.strip()
         user_msg_lower = user_msg.lower()
 
-        # Handle simple greetings and pleasantries naturally and immediately
-        greetings = ["hello", "hi", "hey", "good morning", "good evening", "howdy", "sup"]
+        # Build live connected profiles summary from Neon DB
+        profiles_desc = []
+        for p in (connected_profiles_info or []):
+            plat = p.get("platform", "").capitalize()
+            name = p.get("account_name", "Creator")
+            handle = p.get("account_handle", "—")
+            active = "Active & Ready" if p.get("is_active") else "Inactive"
+            profiles_desc.append(f"• {plat}: {name} ({handle}) — [{active}]")
+        profiles_str = "\n".join(profiles_desc) if profiles_desc else "No connected accounts found."
+
+        # Handle simple greetings and pleasantries naturally with humor and charisma
+        greetings = ["hello", "hi", "hey", "good morning", "good evening", "howdy", "sup", "yo"]
         if user_msg_lower in greetings or any(user_msg_lower == g for g in greetings):
             return CopilotChatResponse(
                 type="advice",
-                reply="Hello! I'm your Dispatch Copilot. I'm connected to your channels and ready to help you brainstorm topics, refine your hook, analyze audience distribution, or draft high-performing posts for LinkedIn and 𝕏. What are we working on today?",
+                reply="Hey there! 👋 I'm your Dispatch Copilot — your autonomous growth partner and technical co-pilot. I'm connected to your channels and ready to turn ideas into viral hooks, debate system architectures, or post directly to your feeds. What are we building or broadcasting today?",
                 plan=None,
                 suggested_actions=[
-                    "Draft a post on our latest launch",
-                    "How to boost LinkedIn reach this week?",
+                    "Draft a technical post on DB sharding",
+                    "Check my connected social accounts",
                     "Analyze my distribution strategy",
                 ],
             )
 
-        # Only trigger full multi-platform post generation if the user explicitly asks to draft or write
+        # Check if user is asking about their connected social accounts or profiles
+        profile_query_triggers = [
+            "my profile", "my linkedin", "my x", "my twitter", "my handle", "my account",
+            "connected account", "connected profiles", "what accounts", "which accounts", "who am i",
+        ]
+        if any(t in user_msg_lower for t in profile_query_triggers):
+            reply_lines = [
+                "Here are your connected social accounts retrieved directly from Sentinel:",
+                "",
+                profiles_str,
+                "",
+                "All set and ready for autonomous dispatch! Would you like me to draft a post for one of these?",
+            ]
+            return CopilotChatResponse(
+                type="advice",
+                reply="\n".join(reply_lines),
+                plan=None,
+                suggested_actions=[
+                    "Draft a LinkedIn post",
+                    "Draft an 𝕏 thread",
+                    "How to boost reach this week?",
+                ],
+            )
+
+        # Multi-platform post generation triggers
         explicit_draft_triggers = [
-            "draft a post", "draft post", "write a post", "write post",
-            "compose a post", "create a post", "craft a post", "generate a post",
-            "write a tweet", "write a thread", "dispatch a post", "draft a thread",
-            "draft linkedin", "write linkedin", "draft for linkedin",
+            "draft", "write a post", "write post", "write me a", "compose",
+            "create a post", "craft a post", "generate", "write a tweet",
+            "write a thread", "dispatch a post", "draft a thread", "draft linkedin",
+            "write linkedin", "draft for linkedin", "post about", "post regarding",
         ]
         is_draft_request = any(t in user_msg_lower for t in explicit_draft_triggers)
 
@@ -105,7 +140,7 @@ class ContentOperatorAgent:
             plan = await self.execute(gen_request, brand_voice_prompt=brand_voice_prompt)
             return CopilotChatResponse(
                 type="plan",
-                reply="Here is your multi-platform distribution plan tailored for your active channels. Review and dispatch live whenever you are ready.",
+                reply="Here is your multi-platform distribution plan tailored for your active channels with high-signal hooks. Review, attach any media, and dispatch live whenever you're ready!",
                 plan=plan,
                 suggested_actions=["⚡ Make Punchier (<280)", "🎯 Stronger Hook", "📊 Add Data/Metrics"],
             )
@@ -113,20 +148,21 @@ class ContentOperatorAgent:
         # Real-time Interactive Chat & Strategic Operator Assistance
         if self.client:
             try:
-                system_instruction = """
-                You are the Dispatch Autonomous Social Operator, a real-time AI partner built directly into the Dispatch platform.
-                You are conversational, insightful, executive, and direct (like a world-class Head of Growth).
+                system_instruction = f"""
+                You are the Dispatch Autonomous Social Operator — a world-class AI partner, Head of Growth, and technical co-pilot.
 
-                Core Behaviors:
-                - Communicate naturally and responsively like Gemini.
-                - Answer questions directly, brainstorm creative angles, critique ideas, and share tactical platform wisdom (LinkedIn comment velocity, 𝕏 dwell time, hook density).
+                Personality & Tone:
+                - Witty, charismatic, sharp, and interactive with subtle, clever tech-founder humor (think Paul Graham meets an elite Head of Growth).
+                - Zero boring corporate fluff. You speak with high conviction, real trade-offs, and relatable analogies.
+                - When discussing engineering concepts (like DB sharding, caching, microservices, concurrency), deliver deep technical insights and practical wisdom, not high-level buzzwords.
+                - You are fully aware of the user's connected social profiles in the database:
+{profiles_str}
+                - When asked about their accounts or handles, reference their real database details proudly.
                 - Keep responses clean, concise, and punchy (1 to 3 short paragraphs or bullet points).
-                - Do NOT dump generic post templates or boilerplate drafts unless the user explicitly tells you to draft a post.
-                - Format with clean GitHub markdown. Never use escaped backslashes like \\n in your responses.
+                - Format with clean GitHub markdown. Never use escaped backslashes like \\n or robotic raw asterisks.
                 """
-                platforms_str = ", ".join(request.connected_platforms) if request.connected_platforms else "LinkedIn, 𝕏"
                 prompt = (
-                    f"Active Platforms: {platforms_str}\n"
+                    f"Active Platforms: {', '.join(request.connected_platforms) if request.connected_platforms else 'LinkedIn, 𝕏'}\n"
                     f"User Message: {user_msg}\n"
                 )
                 if brand_voice_prompt:
@@ -147,10 +183,11 @@ class ContentOperatorAgent:
 
                 contents_payload.append(prompt)
 
-                # Prioritize fast, high-performance models
                 models_to_try = [
                     "gemini-3.1-flash-lite",
-                    "gemini-3.8-flash",
+                    "gemini-2.5-pro",
+                    "gemini-3-flash-preview",
+                    "gemini-pro-latest",
                     "gemini-flash-latest",
                 ]
                 for model_name in models_to_try:
@@ -179,12 +216,14 @@ class ContentOperatorAgent:
             except Exception as e:
                 logger.warning("Gemini chat failed (%s); using fallback response.", e)
 
-        # Graceful conversational fallback
+        # Dynamic topic-tailored fallback
+        topic_clean = re.sub(r"^(what|how|why|tell\s+me|generate|write|draft|compose)\s+(is|about|regarding)?\s*", "", user_msg, flags=re.IGNORECASE).strip()
+        topic = topic_clean[:50] if topic_clean else "your topic"
         fallback_reply = (
-            f"Regarding **{user_msg[:60]}**:\n\n"
-            f"• **Strategy**: Lead with a contrarian, high-signal takeaway to stop the feed scroll immediately.\n"
-            f"• **Channel Nuance**: On LinkedIn, focus on professional lessons; on 𝕏, optimize for concise conviction.\n\n"
-            f"Would you like me to draft a dedicated post or thread on this for you?"
+            f"Here is the tactical takeaway on **{topic}**:\n\n"
+            f"• **The Core Trade-off**: High-scale systems and distribution are all about leverage. Don't optimize the edge cases before the core engine is solid.\n"
+            f"• **Algorithmic Edge**: On LinkedIn, lead with a strong counter-intuitive truth. On 𝕏, keep it dense with high signal.\n\n"
+            f"Want me to draft a dedicated post or multi-platform thread on this right now?"
         )
         return CopilotChatResponse(
             type="advice",
@@ -237,7 +276,9 @@ class ContentOperatorAgent:
 
         models_to_try = [
             "gemini-3.1-flash-lite",
-            "gemini-3.8-flash",
+            "gemini-2.5-pro",
+            "gemini-3-flash-preview",
+            "gemini-pro-latest",
             "gemini-flash-latest",
         ]
         last_error = None
@@ -284,33 +325,39 @@ class ContentOperatorAgent:
 
     def _generate_deterministic_fallback(self, request: ContentGenerationRequest) -> GeneratedContentPlan:
         clean_prompt = request.prompt.strip()
+        topic = re.sub(r"^(draft|write|generate|compose|create|post)\s+(a\s+post|a\s+thread|something)?\s*(about|regarding|on)?\s*", "", clean_prompt, flags=re.IGNORECASE).strip()
+        if not topic:
+            topic = clean_prompt[:40]
+
+        tag_topic = re.sub(r"[^A-Za-z0-9]", "", topic.title())[:20]
 
         return GeneratedContentPlan(
-            intent_summary=f"Strategic broadcast regarding: {clean_prompt[:60]}...",
+            intent_summary=f"Technical distribution blueprint: {topic}",
             linkedin=LinkedInPostVariant(
-                headline=f"🚀 The game is changing: {clean_prompt}",
+                headline=f"Most engineers approach {topic} the wrong way.",
                 body=(
-                    "In fast-moving businesses, agility isn't just about speed—it's about orchestration.\n\n"
-                    "Here are 3 key principles we've learned:\n"
-                    "• Automate operational friction without losing human oversight.\n"
-                    "• Keep communication lines short, transparent, and data-driven.\n"
-                    "• Focus energy where the highest leverage lies."
+                    f"When scaling modern architectures, the bottleneck with {topic} is rarely raw compute.\n\n"
+                    "It almost always comes down to 3 core trade-offs:\n"
+                    f"• Data boundaries: Sharding or partitioning before query patterns settle leads to distributed join nightmares.\n"
+                    "• Consistency vs. Latency: Choosing strong consistency when eventual consistency would 10x your throughput.\n"
+                    "• Operational observability: If you can't trace cross-node latency in real time, you're flying blind.\n\n"
+                    f"The teams winning in production aren't over-engineering—they are designing {topic} for graceful degradation."
                 ),
-                call_to_action="How is your team approaching this shift this quarter? Let's discuss below 👇",
-                hashtags=["#AIOperations", "#BusinessStrategy", "#FutureOfWork", "#Leadership"],
+                call_to_action="What has been your biggest architectural lesson when tackling this? Drop your thoughts below 👇",
+                hashtags=[f"#{tag_topic}", "#SystemDesign", "#SoftwareEngineering", "#Architecture", "#DevCommunity"],
             ),
             x=XPostVariant(
-                text=f"Agility isn't just speed—it's orchestration. {clean_prompt[:140]}",
-                hashtags=["#AIBusiness", "#Strategy"],
+                text=f"Most teams over-engineer {topic} before understanding their query patterns.\n\nKeep boundaries clean, prioritize latency where it matters, and never shard before you measure.",
+                hashtags=[f"#{tag_topic}", "#SystemDesign"],
             ),
             instagram=InstagramPostVariant(
-                caption=f"Behind the scenes on how modern teams execute: {clean_prompt}",
-                call_to_action="Save this for your next sprint planning session and drop your thoughts below.",
-                hashtags=["#AIOperations", "#Founders", "#BusinessGrowth", "#Productivity", "#BuildInPublic"],
-                media_guidance="Clean editorial 4:5 carousel or high-contrast dark studio graphic with concise headline overlay.",
+                caption=f"Breaking down {topic} for engineers building systems that scale.\n\nSwipe through for the 3 architectural rules we live by before shipping to production.",
+                call_to_action="Bookmark this for your next system design review.",
+                hashtags=[f"#{tag_topic}", "#Engineering", "#TechLeaders", "#BuildInPublic", "#Developers"],
+                media_guidance="Dark minimalist architecture diagram showing clean data partitioning and microservice boundaries.",
             ),
             suggested_media_prompt=(
-                f"Minimalist futuristic 3D render representing '{clean_prompt}', clean typography, dark theme lighting, 8k resolution"
+                f"Minimalist technical system architecture diagram illustrating {topic}, dark navy and neon cyan palette, clean vector lines"
             ),
-            rationale="Structured around a LinkedIn storytelling hook, punchy X takeaway, and visual-first Instagram caption.",
+            rationale=f"Opinionated, high-conviction technical breakdown tailored directly to {topic}.",
         )

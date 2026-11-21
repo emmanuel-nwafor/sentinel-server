@@ -114,4 +114,7 @@ class CopilotChatResponse(BaseModel):
     reply: str = Field(description="Autonomous executive response or synthesis commentary")
     plan: Optional[GeneratedContentPlan] = Field(None, description="Distribution plan if drafting was requested")
     suggested_actions: List[str] = Field(default_factory=list, description="Interactive quick-action pills")
+    auto_dispatched: bool = Field(default=False, description="Whether the post was autonomously published live")
+    published_url: Optional[str] = Field(None, description="Direct remote URL of the published post")
+    published_platform: Optional[str] = Field(None, description="Platform that was autonomously published to")
 

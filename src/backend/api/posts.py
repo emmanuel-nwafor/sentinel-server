@@ -107,7 +107,106 @@ async def copilot_chat(
         except Exception:
             pass
 
-    return await agent.chat(request, brand_voice_prompt=brand_voice_prompt)
+    # Retrieve real-time connected social accounts from PostgreSQL
+    profiles_info = []
+    try:
+        social_accs = await uow.social_accounts.list_by_user(current_user.id)
+        for sa in social_accs:
+            profiles_info.append({
+                "platform": sa.platform,
+                "account_name": sa.account_name,
+                "account_handle": sa.account_handle,
+                "is_active": sa.is_active,
+            })
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Failed to fetch user social accounts: %s", exc)
+
+    res = await agent.chat(
+        request,
+        brand_voice_prompt=brand_voice_prompt,
+        connected_profiles_info=profiles_info,
+    )
+
+    # Autonomous Direct Social Publishing Detection
+    msg_lower = request.message.lower()
+    auto_publish_triggers = [
+        "automatically post", "auto post", "publish it to", "post it to",
+        "post for me", "automatically publish", "dispatch to", "auto publish",
+        "post directly",
+    ]
+    should_auto_publish = any(t in msg_lower for t in auto_publish_triggers)
+
+    if should_auto_publish and res.plan:
+        target_plat = "linkedin"
+        if "twitter" in msg_lower or " x" in msg_lower or msg_lower.startswith("x "):
+            target_plat = "x"
+        elif "instagram" in msg_lower:
+            target_plat = "instagram"
+
+        # Check if user has this platform connected
+        has_plat = any(p.get("platform") == target_plat and p.get("is_active") for p in profiles_info)
+        if has_plat:
+            try:
+                # Prepare platform-specific text payload
+                post_text = ""
+                post_tags = []
+                if target_plat == "linkedin":
+                    post_text = f"{res.plan.linkedin.headline}\n\n{res.plan.linkedin.body}\n\n{res.plan.linkedin.call_to_action}".strip()
+                    post_tags = res.plan.linkedin.hashtags or []
+                elif target_plat == "x":
+                    post_text = res.plan.x.text.strip()
+                    post_tags = res.plan.x.hashtags or []
+                elif target_plat == "instagram":
+                    post_text = f"{res.plan.instagram.caption}\n\n{res.plan.instagram.call_to_action}".strip()
+                    post_tags = res.plan.instagram.hashtags or []
+
+                if post_tags:
+                    tags_str = " ".join(post_tags)
+                    if tags_str.lower() not in post_text.lower():
+                        post_text = f"{post_text}\n\n{tags_str}"
+
+                new_post = PostModel(
+                    user_id=current_user.id,
+                    workspace=request.workspace.value if request.workspace else "content",
+                    original_prompt=request.message,
+                    status=PostStatus.DRAFT.value,
+                    linkedin_variant={"formatted_text": post_text, "hashtags": post_tags} if target_plat == "linkedin" else None,
+                    x_variant={"formatted_text": post_text, "hashtags": post_tags} if target_plat == "x" else None,
+                    instagram_variant={"formatted_text": post_text, "hashtags": post_tags} if target_plat == "instagram" else None,
+                    metadata_info={"created_via": "autonomous_copilot"},
+                )
+
+                final_status, results = await publishing_service.publish_post(
+                    uow=uow,
+                    user_id=current_user.id,
+                    post=new_post,
+                    target_platforms=[target_plat],
+                )
+
+                if final_status in (PostStatus.PUBLISHED, PostStatus.PARTIALLY_PUBLISHED):
+                    new_post.status = final_status.value
+                    new_post.publish_results = results
+                    new_post.published_at = datetime.now(timezone.utc)
+                    await uow.posts.create(new_post)
+                    await uow.commit()
+
+                    pub_plat_label = "𝕏" if target_plat == "x" else target_plat.capitalize()
+                    remote_url = results.get(target_plat, {}).get("remote_url")
+
+                    res.auto_dispatched = True
+                    res.published_platform = pub_plat_label
+                    res.published_url = remote_url
+                    res.reply = (
+                        f"🚀 **Autonomously Dispatched!** I've drafted and published this post directly to your live **{pub_plat_label}** feed.\n\n"
+                        f"{res.reply}\n\n"
+                        f"Your live post is now live and gathering engagement."
+                    )
+            except Exception as auto_pub_err:
+                import logging
+                logging.getLogger(__name__).warning("Autonomous publishing encountered error: %s", auto_pub_err)
+
+    return res
 
 
 @router.post("/generate", response_model=ContentGenerationResponse, status_code=status.HTTP_201_CREATED)
