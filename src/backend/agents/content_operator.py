@@ -59,12 +59,9 @@ class ContentOperatorAgent:
         request: ContentGenerationRequest,
         brand_voice_prompt: str = None,
     ) -> GeneratedContentPlan:
-        if self.client:
-            try:
-                return await self._generate_with_llm(request, brand_voice_prompt)
-            except Exception as exc:
-                logger.warning("LLM generation failed (%s); using deterministic fallback.", exc)
-        return self._generate_deterministic_fallback(request)
+        if not self.client:
+            raise RuntimeError("Gemini AI client is not configured or API key is missing.")
+        return await self._generate_with_llm(request, brand_voice_prompt)
 
     async def chat(
         self,
@@ -263,35 +260,18 @@ CORE OPERATING PRINCIPLES:
                             ],
                         )
                 except Exception as exc:
+                    last_error = exc
                     logger.warning("Gemini model %s failed (%s); trying next model...", model_name, exc)
                     continue
 
-        # Dynamic topic-tailored fallback if models are temporarily unavailable
-        topic_clean = re.sub(r"^(what|how|why|tell\s+me|generate|write|draft|compose)\s+(is|about|regarding)?\s*", "", user_msg, flags=re.IGNORECASE).strip()
-        topic = topic_clean[:50] if topic_clean else "system architecture"
-
-        # If user explicitly asked to draft or enhance
-        if any(w in user_msg_lower for w in ["draft", "write", "post", "enhance", "compose", "sharding"]):
-            gen_req = ContentGenerationRequest(prompt=f"{topic} (Niche: {user_niche})", workspace=request.workspace)
-            plan = self._generate_deterministic_fallback(gen_req)
-            return CopilotChatResponse(
-                type="plan",
-                reply=f"Generated an architectural distribution plan focused on {topic} for your engineering niche.",
-                plan=plan,
-                suggested_actions=["⚡ Make Punchier (<280)", "🎯 Stronger Hook", "📊 Add System Metrics"],
-            )
-
-        fallback_reply = (
-            f"Here is the architectural takeaway on **{topic}**:\n\n"
-            f"• **The Core Trade-off**: At scale, premature optimization hurts velocity. Keep boundaries clean and establish clear query patterns before sharding or decoupling.\n"
-            f"• **Distribution Strategy**: On LinkedIn, lead with a strong counter-intuitive engineering truth. On 𝕏, keep it dense with high signal.\n\n"
-            f"Want me to draft a dedicated post or multi-platform thread on this right now?"
-        )
+        # If all AI models fail, return clear error message rather than fake canned text
+        error_detail = str(last_error) if last_error else "Connection timeout or model unavailable"
+        logger.error("All Gemini models failed: %s", error_detail)
         return CopilotChatResponse(
             type="advice",
-            reply=fallback_reply,
+            reply=f"⚠️ Something went wrong while connecting to the AI engine ({error_detail}). Please check your connection and try again.",
             plan=None,
-            suggested_actions=["Draft LinkedIn Post on this", "Draft 𝕏 Thread", "Schedule Multi-Platform"],
+            suggested_actions=["Retry request", "Check system status"],
         )
 
     async def _generate_with_llm(
@@ -384,42 +364,3 @@ CORE OPERATING PRINCIPLES:
                 continue
 
         raise last_error or RuntimeError("All Gemini models failed.")
-
-    def _generate_deterministic_fallback(self, request: ContentGenerationRequest) -> GeneratedContentPlan:
-        clean_prompt = request.prompt.strip()
-        topic = re.sub(r"^(draft|write|generate|compose|create|post)\s+(a\s+post|a\s+thread|something)?\s*(about|regarding|on)?\s*", "", clean_prompt, flags=re.IGNORECASE).strip()
-        if not topic:
-            topic = clean_prompt[:40]
-
-        tag_topic = re.sub(r"[^A-Za-z0-9]", "", topic.title())[:20]
-
-        return GeneratedContentPlan(
-            intent_summary=f"Technical distribution blueprint: {topic}",
-            linkedin=LinkedInPostVariant(
-                headline=f"Most engineers approach {topic} the wrong way.",
-                body=(
-                    f"When scaling modern architectures, the bottleneck with {topic} is rarely raw compute.\n\n"
-                    "It almost always comes down to 3 core trade-offs:\n"
-                    f"• Data boundaries: Sharding or partitioning before query patterns settle leads to distributed join nightmares.\n"
-                    "• Consistency vs. Latency: Choosing strong consistency when eventual consistency would 10x your throughput.\n"
-                    "• Operational observability: If you can't trace cross-node latency in real time, you're flying blind.\n\n"
-                    f"The teams winning in production aren't over-engineering—they are designing {topic} for graceful degradation."
-                ),
-                call_to_action="What has been your biggest architectural lesson when tackling this? Drop your thoughts below 👇",
-                hashtags=[f"#{tag_topic}", "#SystemDesign", "#SoftwareEngineering", "#Architecture", "#DevCommunity"],
-            ),
-            x=XPostVariant(
-                text=f"Most teams over-engineer {topic} before understanding their query patterns.\n\nKeep boundaries clean, prioritize latency where it matters, and never shard before you measure.",
-                hashtags=[f"#{tag_topic}", "#SystemDesign"],
-            ),
-            instagram=InstagramPostVariant(
-                caption=f"Breaking down {topic} for engineers building systems that scale.\n\nSwipe through for the 3 architectural rules we live by before shipping to production.",
-                call_to_action="Bookmark this for your next system design review.",
-                hashtags=[f"#{tag_topic}", "#Engineering", "#TechLeaders", "#BuildInPublic", "#Developers"],
-                media_guidance="Dark minimalist architecture diagram showing clean data partitioning and microservice boundaries.",
-            ),
-            suggested_media_prompt=(
-                f"Minimalist technical system architecture diagram illustrating {topic}, dark navy and neon cyan palette, clean vector lines"
-            ),
-            rationale=f"Opinionated, high-conviction technical breakdown tailored directly to {topic}.",
-        )
