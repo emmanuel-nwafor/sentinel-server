@@ -316,8 +316,9 @@ async def browser_oauth_callback(
             deep_link=f"dispatch://auth/callback?status=success&platform={resolved_platform.value}&account={account.account_name}",
         )
     except Exception as exc:
-        # If exchange failed (e.g. replay/expired code on reload), check if account is already connected
+        # If exchange failed (e.g. replay/expired code on reload), rollback session first, then check if account is already connected
         try:
+            await uow.rollback()
             existing = await uow.social_accounts.get_by_user_and_platform(
                 user_uuid, resolved_platform.value
             )

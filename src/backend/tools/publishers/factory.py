@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone, timedelta
+import logging
 import uuid
 from backend.core.security import TokenCipher, token_cipher
 from backend.models.post import PostModel
@@ -11,6 +12,8 @@ from backend.tools.publishers.linkedin import LinkedInPublisher
 from backend.tools.publishers.x_twitter import XPublisher
 from backend.tools.publishers.instagram import InstagramPublisher
 from backend.unit_of_work.base import IUnitOfWork
+
+logger = logging.getLogger(__name__)
 
 
 class PublisherFactory:
@@ -107,14 +110,19 @@ class SocialPublishingService:
             try:
                 # 1. Proactive Token Refresh if expired or near expiration (< 60s)
                 now = datetime.now(timezone.utc)
+                expires_at = account.token_expires_at
+                if expires_at and expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+
                 if (
-                    account.token_expires_at
-                    and account.token_expires_at <= now + timedelta(seconds=60)
+                    expires_at
+                    and expires_at <= now + timedelta(seconds=60)
                     and account.encrypted_refresh_token
                 ):
                     try:
                         publisher = PublisherFactory.get_publisher(platform)
                         if hasattr(publisher, "refresh_access_token"):
+                            logger.info(f"[{platform.value}] Proactively refreshing access token (expired at {expires_at})")
                             raw_refresh = self._cipher.decrypt(account.encrypted_refresh_token)
                             bundle = await publisher.refresh_access_token(raw_refresh)
                             account.encrypted_access_token = self._cipher.encrypt(bundle.access_token)
@@ -123,8 +131,9 @@ class SocialPublishingService:
                             if bundle.expires_in:
                                 account.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=bundle.expires_in)
                             await uow.commit()
+                            logger.info(f"[{platform.value}] Proactive token refresh successful")
                     except Exception as refresh_err:
-                        pass
+                        logger.warning(f"[{platform.value}] Proactive token refresh failed: {refresh_err}")
 
                 access_token = self._cipher.decrypt(account.encrypted_access_token)
                 publisher = PublisherFactory.get_publisher(platform)
@@ -140,22 +149,27 @@ class SocialPublishingService:
                 except SocialPublishError as pub_err:
                     # 3. Reactive token refresh on 401 Unauthorized
                     err_str = str(pub_err).lower()
-                    if ("401" in err_str or "unauthorized" in err_str) and account.encrypted_refresh_token and hasattr(publisher, "refresh_access_token"):
-                        raw_refresh = self._cipher.decrypt(account.encrypted_refresh_token)
-                        bundle = await publisher.refresh_access_token(raw_refresh)
-                        account.encrypted_access_token = self._cipher.encrypt(bundle.access_token)
-                        if bundle.refresh_token:
-                            account.encrypted_refresh_token = self._cipher.encrypt(bundle.refresh_token)
-                        if bundle.expires_in:
-                            account.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=bundle.expires_in)
-                        await uow.commit()
-                        fresh_access_token = bundle.access_token
-                        result = await publisher.publish(
-                            account=account,
-                            access_token=fresh_access_token,
-                            text=text,
-                            media=post.media,
-                        )
+                    if ("401" in err_str or "unauthorized" in err_str or "expired" in err_str) and account.encrypted_refresh_token and hasattr(publisher, "refresh_access_token"):
+                        logger.info(f"[{platform.value}] Publishing received 401/expired. Attempting reactive token refresh.")
+                        try:
+                            raw_refresh = self._cipher.decrypt(account.encrypted_refresh_token)
+                            bundle = await publisher.refresh_access_token(raw_refresh)
+                            account.encrypted_access_token = self._cipher.encrypt(bundle.access_token)
+                            if bundle.refresh_token:
+                                account.encrypted_refresh_token = self._cipher.encrypt(bundle.refresh_token)
+                            if bundle.expires_in:
+                                account.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=bundle.expires_in)
+                            await uow.commit()
+                            fresh_access_token = bundle.access_token
+                            result = await publisher.publish(
+                                account=account,
+                                access_token=fresh_access_token,
+                                text=text,
+                                media=post.media,
+                            )
+                        except Exception as react_err:
+                            logger.error(f"[{platform.value}] Reactive token refresh also failed: {react_err}")
+                            raise pub_err
                     else:
                         raise pub_err
 

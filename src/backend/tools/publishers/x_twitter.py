@@ -96,15 +96,19 @@ class XPublisher(BaseSocialPublisher):
         if not self.is_oauth_configured():
             raise SocialPublishError("X_CLIENT_ID and X_CLIENT_SECRET are required for token refresh.")
 
+        auth = (settings.X_CLIENT_ID, settings.X_CLIENT_SECRET) if settings.X_CLIENT_SECRET else None
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+        }
+        if not auth:
+            data["client_id"] = settings.X_CLIENT_ID
+
         async with httpx.AsyncClient(timeout=20.0) as client:
             token_resp = await client.post(
                 self.OAUTH_TOKEN_URL,
-                auth=(settings.X_CLIENT_ID, settings.X_CLIENT_SECRET),
-                data={
-                    "grant_type": "refresh_token",
-                    "refresh_token": refresh_token,
-                    "client_id": settings.X_CLIENT_ID,
-                },
+                auth=auth,
+                data=data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             if token_resp.status_code >= 400:
