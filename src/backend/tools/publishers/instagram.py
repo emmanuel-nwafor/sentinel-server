@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from urllib.parse import urlencode
@@ -10,6 +11,8 @@ from backend.tools.publishers.base import (
     OAuthTokenBundle,
     SocialPublishError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class InstagramPublisher(BaseSocialPublisher):
@@ -37,17 +40,18 @@ class InstagramPublisher(BaseSocialPublisher):
         return bool(settings.META_APP_ID and settings.META_APP_SECRET)
 
     def build_authorization_url(self, state: str, redirect_uri: Optional[str] = None) -> str:
+        target_redirect = redirect_uri or settings.META_REDIRECT_URI
         params: Dict[str, Any] = {
-            "client_id": settings.META_APP_ID or "DEMO_META_APP_ID",
-            "redirect_uri": redirect_uri or settings.META_REDIRECT_URI,
-            "state": state,
+            "client_id": settings.META_APP_ID or "1650463666534776",
+            "config_id": settings.META_CONFIG_ID or "1886402302343483",
+            "display": "popup",
+            "override_default_response_type": "true",
+            "redirect_uri": target_redirect,
             "response_type": "code",
+            "state": state,
+            "prompt": "login",
         }
-        if settings.META_CONFIG_ID:
-            params["config_id"] = settings.META_CONFIG_ID
-        else:
-            params["scope"] = ",".join(self.DEFAULT_SCOPES)
-        return f"https://www.facebook.com/{settings.META_GRAPH_API_VERSION}/dialog/oauth?{urlencode(params)}"
+        return f"https://www.facebook.com/dialog/oauth?{urlencode(params)}"
 
     async def exchange_code_for_tokens(
         self, code: str, redirect_uri: Optional[str] = None
@@ -62,7 +66,7 @@ class InstagramPublisher(BaseSocialPublisher):
             token_resp = await client.get(
                 f"{self._graph_base}/oauth/access_token",
                 params={
-                    "client_id": settings.META_APP_ID,
+                    "client_id": settings.META_APP_ID or "1650463666534776",
                     "client_secret": settings.META_APP_SECRET,
                     "redirect_uri": target_redirect,
                     "code": code,
@@ -76,37 +80,113 @@ class InstagramPublisher(BaseSocialPublisher):
             token_data = token_resp.json()
             access_token = token_data["access_token"]
 
-            pages_resp = await client.get(
-                f"{self._graph_base}/me/accounts",
-                params={
-                    "fields": "id,name,instagram_business_account{id,username,name}",
-                    "access_token": access_token,
-                },
-            )
-            if pages_resp.status_code >= 400:
-                raise SocialPublishError(
-                    f"Meta pages lookup failed ({pages_resp.status_code}): {pages_resp.text}"
-                )
-
             ig_account = None
-            for page in pages_resp.json().get("data", []):
-                if page.get("instagram_business_account"):
-                    ig_account = page["instagram_business_account"]
-                    break
+            avatar_url = None
+
+            # 1. Primary Unified Login method: /me/assigned_instagram_accounts
+            try:
+                assigned_resp = await client.get(
+                    f"{self._graph_base}/me/assigned_instagram_accounts",
+                    params={
+                        "fields": "id,username,name,profile_picture_url",
+                        "access_token": access_token,
+                    },
+                )
+                if assigned_resp.status_code == 200:
+                    assigned_data = assigned_resp.json().get("data", [])
+                    if assigned_data:
+                        ig_account = assigned_data[0]
+                        avatar_url = ig_account.get("profile_picture_url")
+            except Exception as e:
+                logger.warning("Failed to fetch assigned_instagram_accounts: %s", e)
+
+            # 2. Fallback: Facebook Pages linked accounts
+            if not ig_account:
+                try:
+                    pages_resp = await client.get(
+                        f"{self._graph_base}/me/accounts",
+                        params={
+                            "fields": "id,name,instagram_business_account{id,username,name,profile_picture_url}",
+                            "access_token": access_token,
+                        },
+                    )
+                    if pages_resp.status_code == 200:
+                        for page in pages_resp.json().get("data", []):
+                            if page.get("instagram_business_account"):
+                                ig_account = page["instagram_business_account"]
+                                avatar_url = ig_account.get("profile_picture_url")
+                                break
+                except Exception as e:
+                    logger.warning("Failed to fetch me/accounts: %s", e)
+
+            # 3. Fallback: /me directly
+            if not ig_account:
+                try:
+                    me_resp = await client.get(
+                        f"{self._graph_base}/me",
+                        params={
+                            "fields": "id,name,username",
+                            "access_token": access_token,
+                        },
+                    )
+                    if me_resp.status_code == 200:
+                        me_data = me_resp.json()
+                        ig_account = {
+                            "id": me_data.get("id"),
+                            "username": me_data.get("username") or me_data.get("name"),
+                            "name": me_data.get("name"),
+                        }
+                except Exception as e:
+                    logger.warning("Failed to fetch me directly: %s", e)
 
             if not ig_account:
                 raise SocialPublishError(
-                    "No linked Instagram Business or Creator account found on your Meta Pages."
+                    "No linked Instagram Professional or Creator account found. Please ensure you have accepted the tester invite or linked your Instagram account in Meta Unified Login."
                 )
+
+            # If avatar wasn't found yet, attempt /{id}?fields=profile_picture_url
+            if not avatar_url and ig_account.get("id"):
+                try:
+                    pic_resp = await client.get(
+                        f"{self._graph_base}/{ig_account['id']}",
+                        params={
+                            "fields": "profile_picture_url",
+                            "access_token": access_token,
+                        },
+                    )
+                    if pic_resp.status_code == 200:
+                        avatar_url = pic_resp.json().get("profile_picture_url")
+                except Exception:
+                    pass
 
             return OAuthTokenBundle(
                 access_token=access_token,
                 expires_in=token_data.get("expires_in"),
-                platform_account_id=ig_account["id"],
-                account_name=ig_account.get("name") or ig_account.get("username") or "Instagram Business",
+                platform_account_id=str(ig_account["id"]),
+                account_name=ig_account.get("name") or ig_account.get("username") or "Instagram Creator",
                 account_handle=f"@{ig_account['username']}" if ig_account.get("username") else None,
+                profile_picture_url=avatar_url,
                 scopes=self.DEFAULT_SCOPES,
             )
+
+    async def get_profile_picture(self, access_token: str) -> Optional[str]:
+        """Fetch user's live Instagram profile picture URL."""
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                resp = await client.get(
+                    f"{self._graph_base}/me/assigned_instagram_accounts",
+                    params={
+                        "fields": "id,username,profile_picture_url",
+                        "access_token": access_token,
+                    },
+                )
+                if resp.status_code == 200:
+                    data = resp.json().get("data", [])
+                    if data and data[0].get("profile_picture_url"):
+                        return data[0]["profile_picture_url"]
+        except Exception:
+            pass
+        return None
 
     def validate_content(self, text: str, media: Optional[Dict[str, Any]] = None) -> None:
         cleaned = (text or "").strip()

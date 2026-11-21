@@ -86,13 +86,13 @@ class Settings(BaseSettings):
     X_ACCESS_TOKEN: str = ""
     X_ACCESS_SECRET: str = ""
 
-    META_APP_ID: str = ""
+    META_APP_ID: str = "1650463666534776"
     META_APP_SECRET: str = ""
-    META_CONFIG_ID: str = ""
+    META_CONFIG_ID: str = "1886402302343483"
     META_REDIRECT_URI: str = (
         "https://dispatch-6mlh.onrender.com/api/v1/social/callback/instagram"
     )
-    META_GRAPH_API_VERSION: str = "v22.0"
+    META_GRAPH_API_VERSION: str = "v21.0"
 
     model_config = SettingsConfigDict(env_file=_ENV_FILES, env_file_encoding="utf-8", extra="ignore")
 
