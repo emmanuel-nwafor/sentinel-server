@@ -106,6 +106,7 @@ class CopilotChatRequest(BaseModel):
     workspace: WorkspaceType = Field(default=WorkspaceType.CONTENT)
     connected_platforms: List[str] = Field(default_factory=list)
     brand_voice_id: Optional[str] = None
+    media_url: Optional[str] = Field(None, description="Optional public URL of image/media to analyze")
 
 
 class CopilotChatResponse(BaseModel):

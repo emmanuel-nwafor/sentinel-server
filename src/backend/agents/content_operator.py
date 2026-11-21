@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+import httpx
 from google import genai
 from google.genai import types
 from backend.core.config import settings
@@ -22,7 +23,14 @@ def clean_text_formatting(text: str) -> str:
     if not text:
         return ""
     # Unescape literal backslashes like \n or \r\n
-    return text.replace("\\r\\n", "\n").replace("\\n", "\n").strip()
+    cleaned = text.replace("\\r\\n", "\n").replace("\\n", "\n")
+    # Replace markdown bullet asterisks e.g. "* **Title:**" or "* Bullet" with Unicode bullet "• "
+    cleaned = re.sub(r"^\s*[*•-]\s+\*\*(.*?)\*\*:\s*", r"• \1: ", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"^\s*[*•-]\s+", r"• ", cleaned, flags=re.MULTILINE)
+    # Strip remaining bold/italic asterisks that clutter native mobile text
+    cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
+    cleaned = re.sub(r"\*(.*?)\*", r"\1", cleaned)
+    return cleaned.strip()
 
 
 def clean_hashtag_list(raw_tags: list) -> list:
@@ -124,6 +132,21 @@ class ContentOperatorAgent:
                 if brand_voice_prompt:
                     prompt += f"\nBrand Voice Context:\n{brand_voice_prompt}"
 
+                contents_payload: list = []
+                if request.media_url:
+                    try:
+                        async with httpx.AsyncClient(timeout=10.0) as img_client:
+                            img_resp = await img_client.get(request.media_url)
+                            if img_resp.status_code == 200:
+                                ctype = img_resp.headers.get("content-type") or "image/jpeg"
+                                contents_payload.append(
+                                    types.Part.from_bytes(data=img_resp.content, mime_type=ctype)
+                                )
+                    except Exception as img_err:
+                        logger.warning("Multimodal image fetch failed: %s", img_err)
+
+                contents_payload.append(prompt)
+
                 # Prioritize fast, high-performance models
                 models_to_try = [
                     "gemini-3.1-flash-lite",
@@ -134,7 +157,7 @@ class ContentOperatorAgent:
                     try:
                         resp = self.client.models.generate_content(
                             model=model_name,
-                            contents=prompt,
+                            contents=contents_payload,
                             config=types.GenerateContentConfig(
                                 system_instruction=system_instruction,
                                 temperature=0.7,

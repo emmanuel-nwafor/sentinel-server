@@ -3,6 +3,7 @@ from typing import List, Optional
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse
+from sqlalchemy.orm.attributes import flag_modified
 from backend.core.config import settings
 from backend.core.security import (
     create_oauth_state_token,
@@ -102,16 +103,23 @@ async def list_connected_accounts(
     
     for acc in accounts:
         ser = _serialize_social_account(acc)
-        # If avatar is not yet cached in scopes and this is LinkedIn, fetch it live
-        if not ser.profile_picture_url and acc.platform == "linkedin" and acc.encrypted_access_token and acc.is_active:
+        # If avatar is not yet cached in scopes, fetch it live from the platform
+        if not ser.profile_picture_url and acc.encrypted_access_token and acc.is_active:
             try:
-                publisher = PublisherFactory.get_publisher(SocialPlatform.LINKEDIN)
+                platform_enum = SocialPlatform(acc.platform)
+                publisher = PublisherFactory.get_publisher(platform_enum)
                 if hasattr(publisher, "get_profile_picture"):
                     token = token_cipher.decrypt(acc.encrypted_access_token)
                     pic = await publisher.get_profile_picture(token)
                     if pic:
                         ser.profile_picture_url = pic
-                        acc.scopes = list(acc.scopes or []) + [f"avatar:{pic}"]
+                        updated_scopes = [
+                            s for s in (acc.scopes or [])
+                            if not (isinstance(s, str) and s.startswith("avatar:"))
+                        ]
+                        updated_scopes.append(f"avatar:{pic}")
+                        acc.scopes = updated_scopes
+                        flag_modified(acc, "scopes")
                         await uow.commit()
             except Exception:
                 pass

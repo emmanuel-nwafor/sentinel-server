@@ -173,22 +173,30 @@ class LinkedInPublisher(BaseSocialPublisher):
         access_token: str,
         owner_urn: str,
         image_url: str,
+        candidate_versions: Optional[List[str]] = None,
     ) -> str:
         """
         LinkedIn 3-step media upload:
         1) Initialize upload slot to get uploadUrl + image URN.
         2) Stream image bytes from storage/local disk.
-        3) PUT binary payload directly to LinkedIn's uploadUrl.
+        3) PUT binary payload directly to presigned uploadUrl (NO Authorization header).
         """
-        init_resp = await client.post(
-            self.IMAGES_API_URL,
-            headers=self._rest_headers(access_token),
-            json={"initializeUploadRequest": {"owner": owner_urn}},
-        )
-        if init_resp.status_code >= 400:
-            raise SocialPublishError(
-                f"LinkedIn image upload init failed ({init_resp.status_code}): {init_resp.text}"
+        versions = candidate_versions or [settings.LINKEDIN_API_VERSION or "202611"]
+        init_resp = None
+        for ver in versions:
+            init_resp = await client.post(
+                self.IMAGES_API_URL,
+                headers=self._rest_headers(access_token, version=ver),
+                json={"initializeUploadRequest": {"owner": owner_urn}},
             )
+            if init_resp.status_code == 426 and "NONEXISTENT_VERSION" in init_resp.text:
+                continue
+            break
+
+        if not init_resp or init_resp.status_code >= 400:
+            err_text = init_resp.text if init_resp else "No response"
+            err_code = init_resp.status_code if init_resp else 500
+            raise SocialPublishError(f"LinkedIn image upload init failed ({err_code}): {err_text}")
 
         value = init_resp.json().get("value", {})
         upload_url = value.get("uploadUrl")
@@ -205,11 +213,11 @@ class LinkedInPublisher(BaseSocialPublisher):
         else:
             image_bytes, content_type = await self._download_media_bytes(image_url)
 
+        # Pre-signed S3 upload: DO NOT pass Authorization header
         put_resp = await client.put(
             upload_url,
             content=image_bytes,
             headers={
-                "Authorization": f"Bearer {access_token}",
                 "Content-Type": content_type or "image/jpeg",
             },
         )
@@ -225,22 +233,30 @@ class LinkedInPublisher(BaseSocialPublisher):
         access_token: str,
         owner_urn: str,
         video_url: str,
+        candidate_versions: Optional[List[str]] = None,
     ) -> str:
         """
         LinkedIn 3-step video upload:
         1) Initialize video upload slot via POST /rest/videos?action=initializeUpload.
         2) Read video bytes from storage or local disk.
-        3) PUT binary video payload directly to LinkedIn's uploadUrl.
+        3) PUT binary video payload directly to presigned uploadUrl (NO Authorization header).
         """
-        init_resp = await client.post(
-            self.VIDEOS_API_URL,
-            headers=self._rest_headers(access_token),
-            json={"initializeUploadRequest": {"owner": owner_urn}},
-        )
-        if init_resp.status_code >= 400:
-            raise SocialPublishError(
-                f"LinkedIn video upload init failed ({init_resp.status_code}): {init_resp.text}"
+        versions = candidate_versions or [settings.LINKEDIN_API_VERSION or "202611"]
+        init_resp = None
+        for ver in versions:
+            init_resp = await client.post(
+                self.VIDEOS_API_URL,
+                headers=self._rest_headers(access_token, version=ver),
+                json={"initializeUploadRequest": {"owner": owner_urn}},
             )
+            if init_resp.status_code == 426 and "NONEXISTENT_VERSION" in init_resp.text:
+                continue
+            break
+
+        if not init_resp or init_resp.status_code >= 400:
+            err_text = init_resp.text if init_resp else "No response"
+            err_code = init_resp.status_code if init_resp else 500
+            raise SocialPublishError(f"LinkedIn video upload init failed ({err_code}): {err_text}")
 
         value = init_resp.json().get("value", {})
         instructions = value.get("uploadInstructions", [])
@@ -259,11 +275,11 @@ class LinkedInPublisher(BaseSocialPublisher):
         else:
             video_bytes, content_type = await self._download_media_bytes(video_url)
 
+        # Pre-signed S3 upload: DO NOT pass Authorization header
         put_resp = await client.put(
             upload_url,
             content=video_bytes,
             headers={
-                "Authorization": f"Bearer {access_token}",
                 "Content-Type": content_type or "video/mp4",
             },
         )
@@ -331,12 +347,12 @@ class LinkedInPublisher(BaseSocialPublisher):
                 media_type = media.get("type", "image")
                 if media_type == "video":
                     video_urn = await self._upload_video_asset(
-                        client, access_token, author_urn, media["url"]
+                        client, access_token, author_urn, media["url"], candidate_versions=candidate_versions
                     )
                     payload["content"] = {"media": {"id": video_urn, "title": "Video Broadcast"}}
                 else:
                     image_urn = await self._upload_image_asset(
-                        client, access_token, author_urn, media["url"]
+                        client, access_token, author_urn, media["url"], candidate_versions=candidate_versions
                     )
                     payload["content"] = {"media": {"id": image_urn, "title": "Image Asset"}}
 

@@ -72,7 +72,7 @@ class XPublisher(BaseSocialPublisher):
             access_token = token_data["access_token"]
 
             me_resp = await client.get(
-                self.USERS_ME_URL,
+                f"{self.USERS_ME_URL}?user.fields=profile_image_url",
                 headers={"Authorization": f"Bearer {access_token}"},
             )
             if me_resp.status_code >= 400:
@@ -81,6 +81,8 @@ class XPublisher(BaseSocialPublisher):
                 )
 
             user_data = me_resp.json().get("data", {})
+            raw_pic = user_data.get("profile_image_url")
+            pic = raw_pic.replace("_normal.", "_400x400.") if raw_pic else None
             return OAuthTokenBundle(
                 access_token=access_token,
                 refresh_token=token_data.get("refresh_token"),
@@ -88,8 +90,26 @@ class XPublisher(BaseSocialPublisher):
                 platform_account_id=user_data["id"],
                 account_name=user_data.get("name") or "X User",
                 account_handle=f"@{user_data['username']}" if user_data.get("username") else None,
+                profile_picture_url=pic,
                 scopes=self.DEFAULT_SCOPES,
             )
+
+    async def get_profile_picture(self, access_token: str) -> Optional[str]:
+        """Fetch user's live profile picture URL from Twitter/X API v2."""
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                resp = await client.get(
+                    f"{self.USERS_ME_URL}?user.fields=profile_image_url",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json().get("data", {})
+                    pic = data.get("profile_image_url")
+                    if pic:
+                        return pic.replace("_normal.", "_400x400.")
+        except Exception:
+            pass
+        return None
 
     async def refresh_access_token(self, refresh_token: str) -> OAuthTokenBundle:
         """Exchange stored refresh token for fresh OAuth 2.0 access and refresh tokens."""
