@@ -95,8 +95,23 @@ class LinkedInPublisher(BaseSocialPublisher):
                 platform_account_id=person_id,
                 account_name=profile.get("name") or "LinkedIn Member",
                 account_handle=profile.get("email"),
+                profile_picture_url=profile.get("picture"),
                 scopes=self.DEFAULT_SCOPES,
             )
+
+    async def get_profile_picture(self, access_token: str) -> Optional[str]:
+        """Fetch member's live profile picture URL from LinkedIn userinfo."""
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                resp = await client.get(
+                    self.USERINFO_URL,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+                if resp.status_code == 200:
+                    return resp.json().get("picture")
+        except Exception:
+            pass
+        return None
 
     async def refresh_access_token(self, refresh_token: str) -> OAuthTokenBundle:
         """Exchange refresh token for fresh LinkedIn access token."""

@@ -306,14 +306,24 @@ async def create_manual_post(
     post_id = uuid.uuid4()
     platforms_lower = [p.lower() for p in request.platforms]
 
-    # Extract any hashtags written in the text like #buildinpublic #startup
+    # Extract and clean content formatting (convert double-escaped newlines to real newlines)
     import re
-    inline_tags = re.findall(r"#\w+", request.content)
-    combined_tags = list(dict.fromkeys((request.hashtags or []) + inline_tags))
-    clean_tags = [t if t.startswith("#") else f"#{t}" for t in combined_tags if t.strip()]
+    cleaned_content = request.content.replace("\\r\\n", "\n").replace("\\n", "\n").strip()
+
+    # Extract any hashtags written in the text like #buildinpublic #startup and clean quotes/commas
+    raw_tags = (request.hashtags or [])
+    inline_tags = re.findall(r"#\w+", cleaned_content)
+    all_raw = raw_tags + inline_tags
+    clean_tags = []
+    for tag in all_raw:
+        for part in re.split(r"[,;'\"]+", str(tag)):
+            c = part.strip().strip("'\"#")
+            if c and re.match(r"^[A-Za-z0-9_]+$", c):
+                clean_tags.append(f"#{c}")
+    clean_tags = list(dict.fromkeys(clean_tags))
 
     # Ensure formatted text has hashtags attached at the end if not already in text
-    formatted_content = request.content.strip()
+    formatted_content = cleaned_content
     tags_to_append = [t for t in clean_tags if t.lower() not in formatted_content.lower()]
     if tags_to_append:
         formatted_content = f"{formatted_content}\n\n{' '.join(tags_to_append)}"

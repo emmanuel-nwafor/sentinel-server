@@ -12,6 +12,7 @@ class SocialAccountResponse(BaseModel):
     platform_account_id: str
     account_name: str
     account_handle: Optional[str] = None
+    profile_picture_url: Optional[str] = None
     scopes: List[str] = Field(default_factory=list)
     is_active: bool
     is_sandbox: bool

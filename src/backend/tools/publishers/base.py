@@ -16,6 +16,7 @@ class OAuthTokenBundle:
     platform_account_id: str
     account_name: str
     account_handle: Optional[str] = None
+    profile_picture_url: Optional[str] = None
     refresh_token: Optional[str] = None
     expires_in: Optional[int] = None
     scopes: List[str] = field(default_factory=list)

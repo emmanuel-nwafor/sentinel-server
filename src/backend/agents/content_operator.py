@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 from google import genai
 from google.genai import types
 from backend.core.config import settings
@@ -17,11 +18,28 @@ from backend.schemas.content import (
 logger = logging.getLogger(__name__)
 
 
+def clean_text_formatting(text: str) -> str:
+    if not text:
+        return ""
+    # Unescape literal backslashes like \n or \r\n
+    return text.replace("\\r\\n", "\n").replace("\\n", "\n").strip()
+
+
+def clean_hashtag_list(raw_tags: list) -> list:
+    cleaned = []
+    for tag in raw_tags or []:
+        for part in re.split(r"[,;'\"]+", str(tag)):
+            p_clean = part.strip().strip("'\"#")
+            if p_clean and re.match(r"^[A-Za-z0-9_]+$", p_clean):
+                cleaned.append(f"#{p_clean}")
+    return list(dict.fromkeys(cleaned))
+
+
 class ContentOperatorAgent:
     """
     Dispatch Content Operator Agent:
     Transforms natural language intents into platform-native posts for LinkedIn, X, and Instagram
-    using Gemini 2.5 Flash with strict Pydantic JSON schema extraction.
+    using Gemini with lightning-fast response times and natural real-time chat interactions.
     """
 
     def __init__(self):
@@ -48,13 +66,28 @@ class ContentOperatorAgent:
         user_msg = request.message.strip()
         user_msg_lower = user_msg.lower()
 
-        # Check if the prompt is an explicit command to draft/write a post or thread
-        draft_triggers = [
-            "draft", "write a post", "compose a post", "create a post", "craft a post",
-            "generate post", "write a tweet", "write a thread", "dispatch a post",
-            "make a post", "write post", "draft post", "announce our", "craft a",
+        # Handle simple greetings and pleasantries naturally and immediately
+        greetings = ["hello", "hi", "hey", "good morning", "good evening", "howdy", "sup"]
+        if user_msg_lower in greetings or any(user_msg_lower == g for g in greetings):
+            return CopilotChatResponse(
+                type="advice",
+                reply="Hello! I'm your Dispatch Copilot. I'm connected to your channels and ready to help you brainstorm topics, refine your hook, analyze audience distribution, or draft high-performing posts for LinkedIn and 𝕏. What are we working on today?",
+                plan=None,
+                suggested_actions=[
+                    "Draft a post on our latest launch",
+                    "How to boost LinkedIn reach this week?",
+                    "Analyze my distribution strategy",
+                ],
+            )
+
+        # Only trigger full multi-platform post generation if the user explicitly asks to draft or write
+        explicit_draft_triggers = [
+            "draft a post", "draft post", "write a post", "write post",
+            "compose a post", "create a post", "craft a post", "generate a post",
+            "write a tweet", "write a thread", "dispatch a post", "draft a thread",
+            "draft linkedin", "write linkedin", "draft for linkedin",
         ]
-        is_draft_request = any(t in user_msg_lower for t in draft_triggers) or len(user_msg) > 130
+        is_draft_request = any(t in user_msg_lower for t in explicit_draft_triggers)
 
         if is_draft_request:
             gen_request = ContentGenerationRequest(
@@ -64,50 +97,50 @@ class ContentOperatorAgent:
             plan = await self.execute(gen_request, brand_voice_prompt=brand_voice_prompt)
             return CopilotChatResponse(
                 type="plan",
-                reply="I've crafted an omnichannel distribution plan optimized for your connected platforms. Review the variants below and dispatch live whenever you are ready.",
+                reply="Here is your multi-platform distribution plan tailored for your active channels. Review and dispatch live whenever you are ready.",
                 plan=plan,
                 suggested_actions=["⚡ Make Punchier (<280)", "🎯 Stronger Hook", "📊 Add Data/Metrics"],
             )
 
-        # Autonomous Social Media Operator Reasoning & Advice
+        # Real-time Interactive Chat & Strategic Operator Assistance
         if self.client:
             try:
                 system_instruction = """
-                You are the Dispatch Autonomous Social Operator. You are not a generic chatbot or simple draft tool;
-                you are an elite social operations partner for founders, software builders, and business creators on LinkedIn and 𝕏.
+                You are the Dispatch Autonomous Social Operator, a real-time AI partner built directly into the Dispatch platform.
+                You are conversational, insightful, executive, and direct (like a world-class Head of Growth).
 
-                Your personality:
-                - Highly strategic, sharp, executive, and direct (like a top-tier Head of Growth & Communications).
-                - Grounded in modern algorithmic reality: explain why comment velocity in the first 60 minutes matters on LinkedIn,
-                  why external links kill organic reach (put links in comments), how dwell time works, and how to craft polarizing or high-signal 𝕏 hooks.
-                - When asked about niche topics, audience engagement, or strategy, provide 2 to 3 concise, punchy bullet points followed by a concrete next action.
-                - Keep total response under 200 words. Format with clean markdown bullets.
+                Core Behaviors:
+                - Communicate naturally and responsively like Gemini.
+                - Answer questions directly, brainstorm creative angles, critique ideas, and share tactical platform wisdom (LinkedIn comment velocity, 𝕏 dwell time, hook density).
+                - Keep responses clean, concise, and punchy (1 to 3 short paragraphs or bullet points).
+                - Do NOT dump generic post templates or boilerplate drafts unless the user explicitly tells you to draft a post.
+                - Format with clean GitHub markdown. Never use escaped backslashes like \\n in your responses.
                 """
                 platforms_str = ", ".join(request.connected_platforms) if request.connected_platforms else "LinkedIn, 𝕏"
                 prompt = (
-                    f"Connected Channels: {platforms_str}\n"
-                    f"User Inquiry: {user_msg}\n"
+                    f"Active Platforms: {platforms_str}\n"
+                    f"User Message: {user_msg}\n"
                 )
                 if brand_voice_prompt:
-                    prompt += f"\nBrand Voice:\n{brand_voice_prompt}"
+                    prompt += f"\nBrand Voice Context:\n{brand_voice_prompt}"
 
+                # Prioritize fast, high-performance models
                 models_to_try = [
-                    settings.GEMINI_MODEL or "gemini-3.8-flash",
+                    "gemini-3.1-flash-lite",
                     "gemini-3.8-flash",
                     "gemini-flash-latest",
-                    "gemini-flash-lite-latest",
                 ]
-                for model_name in dict.fromkeys(models_to_try):
+                for model_name in models_to_try:
                     try:
                         resp = self.client.models.generate_content(
                             model=model_name,
                             contents=prompt,
                             config=types.GenerateContentConfig(
                                 system_instruction=system_instruction,
-                                temperature=0.6,
+                                temperature=0.7,
                             ),
                         )
-                        reply_text = resp.text.strip()
+                        reply_text = clean_text_formatting(resp.text)
                         return CopilotChatResponse(
                             type="advice",
                             reply=reply_text,
@@ -115,20 +148,20 @@ class ContentOperatorAgent:
                             suggested_actions=[
                                 "Draft LinkedIn Post on this",
                                 "Draft 𝕏 Thread",
-                                "Optimize Reach Strategy",
+                                "Refine Strategic Hook",
                             ],
                         )
                     except Exception as e:
-                        logger.warning("Gemini chat model %s failed: %s", model_name, e)
+                        logger.warning("Gemini model %s failed: %s", model_name, e)
             except Exception as e:
                 logger.warning("Gemini chat failed (%s); using fallback response.", e)
 
-        # High-signal fallback operator response
+        # Graceful conversational fallback
         fallback_reply = (
-            f"Here is your strategic distribution breakdown for **{user_msg[:50]}**:\n\n"
-            f"• **LinkedIn**: Maximize dwell time by opening with a high-contrast dilemma before offering the solution. Keep links out of the main post.\n"
-            f"• **𝕏 (Twitter)**: Lead with a 1-sentence contrarian claim. Fast replies in the first 30 minutes boost algorithmic distribution.\n"
-            f"• **Next Move**: Shall I draft a platform-native post or thread on this topic for you?"
+            f"Regarding **{user_msg[:60]}**:\n\n"
+            f"• **Strategy**: Lead with a contrarian, high-signal takeaway to stop the feed scroll immediately.\n"
+            f"• **Channel Nuance**: On LinkedIn, focus on professional lessons; on 𝕏, optimize for concise conviction.\n\n"
+            f"Would you like me to draft a dedicated post or thread on this for you?"
         )
         return CopilotChatResponse(
             type="advice",
@@ -180,15 +213,12 @@ class ContentOperatorAgent:
         prompt = "\n".join(prompt_parts)
 
         models_to_try = [
-            settings.GEMINI_MODEL or "gemini-3.8-flash",
+            "gemini-3.1-flash-lite",
             "gemini-3.8-flash",
             "gemini-flash-latest",
-            "gemini-flash-lite-latest",
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-pro",
         ]
         last_error = None
-        for model_name in dict.fromkeys(models_to_try):
+        for model_name in models_to_try:
             try:
                 response = self.client.models.generate_content(
                     model=model_name,
@@ -201,6 +231,26 @@ class ContentOperatorAgent:
                     ),
                 )
                 data = json.loads(response.text)
+                # Clean up formatting signatures, escaped newlines and malformed hashtag strings
+                if "linkedin" in data and isinstance(data["linkedin"], dict):
+                    li = data["linkedin"]
+                    li["headline"] = clean_text_formatting(li.get("headline", ""))
+                    li["body"] = clean_text_formatting(li.get("body", ""))
+                    li["call_to_action"] = clean_text_formatting(li.get("call_to_action", ""))
+                    li["hashtags"] = clean_hashtag_list(li.get("hashtags", []))
+
+                if "x" in data and isinstance(data["x"], dict):
+                    x_var = data["x"]
+                    x_var["text"] = clean_text_formatting(x_var.get("text", ""))
+                    x_var["hashtags"] = clean_hashtag_list(x_var.get("hashtags", []))
+
+                if "instagram" in data and isinstance(data["instagram"], dict):
+                    ig = data["instagram"]
+                    ig["caption"] = clean_text_formatting(ig.get("caption", ""))
+                    ig["call_to_action"] = clean_text_formatting(ig.get("call_to_action", ""))
+                    ig["media_guidance"] = clean_text_formatting(ig.get("media_guidance", ""))
+                    ig["hashtags"] = clean_hashtag_list(ig.get("hashtags", []))
+
                 return GeneratedContentPlan(**data)
             except Exception as exc:
                 last_error = exc

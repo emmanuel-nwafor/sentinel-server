@@ -26,13 +26,22 @@ router = APIRouter(prefix="/social", tags=["Social Connections"])
 
 
 def _serialize_social_account(account: SocialAccountModel) -> SocialAccountResponse:
+    avatar_url = None
+    clean_scopes = []
+    for s in (account.scopes or []):
+        if isinstance(s, str) and s.startswith("avatar:"):
+            avatar_url = s[7:]
+        else:
+            clean_scopes.append(s)
+
     return SocialAccountResponse(
         id=str(account.id),
         platform=SocialPlatform(account.platform),
         platform_account_id=account.platform_account_id,
         account_name=account.account_name,
         account_handle=account.account_handle,
-        scopes=account.scopes or [],
+        profile_picture_url=avatar_url,
+        scopes=clean_scopes,
         is_active=account.is_active,
         is_sandbox=account.is_sandbox,
         token_expires_at=account.token_expires_at,
@@ -59,6 +68,11 @@ async def _persist_oauth_bundle(
         else None
     )
 
+    stored_scopes = list(bundle.scopes or [])
+    if bundle.profile_picture_url:
+        stored_scopes = [s for s in stored_scopes if not (isinstance(s, str) and s.startswith("avatar:"))]
+        stored_scopes.append(f"avatar:{bundle.profile_picture_url}")
+
     account = await uow.social_accounts.upsert_account(
         user_id=user_id,
         platform=platform.value,
@@ -70,7 +84,7 @@ async def _persist_oauth_bundle(
             token_cipher.encrypt(bundle.refresh_token) if bundle.refresh_token else None
         ),
         token_expires_at=expires_at,
-        scopes=bundle.scopes,
+        scopes=stored_scopes,
         is_sandbox=False,
     )
     await uow.commit()
@@ -82,9 +96,28 @@ async def list_connected_accounts(
     current_user: UserModel = Depends(get_current_user),
     uow: IUnitOfWork = Depends(get_uow),
 ):
-    """List all social accounts connected by the current user inside Sentinel."""
+    """List all social accounts connected by the current user inside Sentinel with real-time profile pictures."""
     accounts = await uow.social_accounts.list_by_user(current_user.id)
-    return [_serialize_social_account(acc) for acc in accounts]
+    serialized: List[SocialAccountResponse] = []
+    
+    for acc in accounts:
+        ser = _serialize_social_account(acc)
+        # If avatar is not yet cached in scopes and this is LinkedIn, fetch it live
+        if not ser.profile_picture_url and acc.platform == "linkedin" and acc.encrypted_access_token and acc.is_active:
+            try:
+                publisher = PublisherFactory.get_publisher(SocialPlatform.LINKEDIN)
+                if hasattr(publisher, "get_profile_picture"):
+                    token = token_cipher.decrypt(acc.encrypted_access_token)
+                    pic = await publisher.get_profile_picture(token)
+                    if pic:
+                        ser.profile_picture_url = pic
+                        acc.scopes = list(acc.scopes or []) + [f"avatar:{pic}"]
+                        await uow.commit()
+            except Exception:
+                pass
+        serialized.append(ser)
+
+    return serialized
 
 
 @router.get("/connect/{platform}", response_model=OAuthStartResponse)
