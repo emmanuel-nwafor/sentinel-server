@@ -122,10 +122,17 @@ async def copilot_chat(
         import logging
         logging.getLogger(__name__).warning("Failed to fetch user social accounts: %s", exc)
 
+    user_context = {
+        "name": current_user.name or "Emmanuel Onyekachi",
+        "email": current_user.email,
+        "niche": "Software Engineer, AI Engineer, AI Automation & Scalable Architecture",
+    }
+
     res = await agent.chat(
         request,
         brand_voice_prompt=brand_voice_prompt,
         connected_profiles_info=profiles_info,
+        user_context=user_context,
     )
 
     # Autonomous Direct Social Publishing Detection

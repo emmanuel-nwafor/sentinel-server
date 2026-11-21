@@ -71,6 +71,7 @@ class ContentOperatorAgent:
         request: CopilotChatRequest,
         brand_voice_prompt: str = None,
         connected_profiles_info: list = None,
+        user_context: dict = None,
     ) -> CopilotChatResponse:
         user_msg = request.message.strip()
         user_msg_lower = user_msg.lower()
@@ -85,144 +86,205 @@ class ContentOperatorAgent:
             profiles_desc.append(f"• {plat}: {name} ({handle}) — [{active}]")
         profiles_str = "\n".join(profiles_desc) if profiles_desc else "No connected accounts found."
 
-        # Handle simple greetings and pleasantries naturally with humor and charisma
-        greetings = ["hello", "hi", "hey", "good morning", "good evening", "howdy", "sup", "yo"]
-        if user_msg_lower in greetings or any(user_msg_lower == g for g in greetings):
-            return CopilotChatResponse(
-                type="advice",
-                reply="Hey there! 👋 I'm your Dispatch Copilot — your autonomous growth partner and technical co-pilot. I'm connected to your channels and ready to turn ideas into viral hooks, debate system architectures, or post directly to your feeds. What are we building or broadcasting today?",
-                plan=None,
-                suggested_actions=[
-                    "Draft a technical post on DB sharding",
-                    "Check my connected social accounts",
-                    "Analyze my distribution strategy",
-                ],
-            )
+        user_name = (user_context or {}).get("name") or "Emmanuel Onyekachi"
+        user_niche = (user_context or {}).get("niche") or "Software Engineer, AI Engineer, AI Automation & Scalable Architecture"
 
-        # Check if user is asking about their connected social accounts or profiles
-        profile_query_triggers = [
-            "my profile", "my linkedin", "my x", "my twitter", "my handle", "my account",
-            "connected account", "connected profiles", "what accounts", "which accounts", "who am i",
-        ]
-        if any(t in user_msg_lower for t in profile_query_triggers):
-            reply_lines = [
-                "Here are your connected social accounts retrieved directly from Sentinel:",
-                "",
-                profiles_str,
-                "",
-                "All set and ready for autonomous dispatch! Would you like me to draft a post for one of these?",
-            ]
-            return CopilotChatResponse(
-                type="advice",
-                reply="\n".join(reply_lines),
-                plan=None,
-                suggested_actions=[
-                    "Draft a LinkedIn post",
-                    "Draft an 𝕏 thread",
-                    "How to boost reach this week?",
-                ],
-            )
-
-        # Multi-platform post generation triggers
-        explicit_draft_triggers = [
-            "draft", "write a post", "write post", "write me a", "compose",
-            "create a post", "craft a post", "generate", "write a tweet",
-            "write a thread", "dispatch a post", "draft a thread", "draft linkedin",
-            "write linkedin", "draft for linkedin", "post about", "post regarding",
-        ]
-        is_draft_request = any(t in user_msg_lower for t in explicit_draft_triggers)
-
-        if is_draft_request:
-            gen_request = ContentGenerationRequest(
-                prompt=user_msg,
-                workspace=request.workspace,
-            )
-            plan = await self.execute(gen_request, brand_voice_prompt=brand_voice_prompt)
-            return CopilotChatResponse(
-                type="plan",
-                reply="Here is your multi-platform distribution plan tailored for your active channels with high-signal hooks. Review, attach any media, and dispatch live whenever you're ready!",
-                plan=plan,
-                suggested_actions=["⚡ Make Punchier (<280)", "🎯 Stronger Hook", "📊 Add Data/Metrics"],
-            )
-
-        # Real-time Interactive Chat & Strategic Operator Assistance
-        if self.client:
-            try:
-                system_instruction = f"""
-                You are the Dispatch Autonomous Social Operator — a world-class AI partner, Head of Growth, and technical co-pilot.
-
-                Personality & Tone:
-                - Witty, charismatic, sharp, and interactive with subtle, clever tech-founder humor (think Paul Graham meets an elite Head of Growth).
-                - Zero boring corporate fluff. You speak with high conviction, real trade-offs, and relatable analogies.
-                - When discussing engineering concepts (like DB sharding, caching, microservices, concurrency), deliver deep technical insights and practical wisdom, not high-level buzzwords.
-                - You are fully aware of the user's connected social profiles in the database:
-{profiles_str}
-                - When asked about their accounts or handles, reference their real database details proudly.
-                - Keep responses clean, concise, and punchy (1 to 3 short paragraphs or bullet points).
-                - Format with clean GitHub markdown. Never use escaped backslashes like \\n or robotic raw asterisks.
-                """
-                prompt = (
-                    f"Active Platforms: {', '.join(request.connected_platforms) if request.connected_platforms else 'LinkedIn, 𝕏'}\n"
-                    f"User Message: {user_msg}\n"
-                )
-                if brand_voice_prompt:
-                    prompt += f"\nBrand Voice Context:\n{brand_voice_prompt}"
-
-                contents_payload: list = []
-                if request.media_url:
-                    try:
-                        async with httpx.AsyncClient(timeout=10.0) as img_client:
-                            img_resp = await img_client.get(request.media_url)
-                            if img_resp.status_code == 200:
-                                ctype = img_resp.headers.get("content-type") or "image/jpeg"
-                                contents_payload.append(
-                                    types.Part.from_bytes(data=img_resp.content, mime_type=ctype)
-                                )
-                    except Exception as img_err:
-                        logger.warning("Multimodal image fetch failed: %s", img_err)
-
-                contents_payload.append(prompt)
-
-                models_to_try = [
-                    "gemini-3.1-flash-lite",
-                    "gemini-2.5-pro",
-                    "gemini-3-flash-preview",
-                    "gemini-pro-latest",
-                    "gemini-flash-latest",
+        # Agentic Architecture: Tools (Function Declarations)
+        tools = [
+            types.Tool(
+                function_declarations=[
+                    types.FunctionDeclaration(
+                        name="draft_post_plan",
+                        description="Synthesize high-performing, platform-tailored post variants for LinkedIn, X (Twitter), and Instagram based on the user's topic, raw notes, or draft. Use this whenever the user asks to draft, write, compose, enhance, or create a post.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "topic_or_draft": types.Schema(
+                                    type="STRING",
+                                    description="The core topic, raw notes, or draft content to enhance and turn into social posts.",
+                                ),
+                                "angle": types.Schema(
+                                    type="STRING",
+                                    description="Optional technical angle, contrarian perspective, or strategic hook.",
+                                ),
+                            },
+                            required=["topic_or_draft"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="publish_post_to_social",
+                        description="Autonomously publish a post live to a connected social platform (LinkedIn, X, or Instagram). Use this ONLY when the user explicitly asks to post, publish, or dispatch directly.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "platform": types.Schema(
+                                    type="STRING",
+                                    description="Target platform: 'linkedin', 'x', or 'instagram'.",
+                                ),
+                                "content": types.Schema(
+                                    type="STRING",
+                                    description="The post content to publish.",
+                                ),
+                            },
+                            required=["platform"],
+                        ),
+                    ),
+                    types.FunctionDeclaration(
+                        name="get_connected_accounts_info",
+                        description="Retrieve details about the user's connected social media accounts (handles, status). Use this ONLY when the user explicitly asks to check or list their connected accounts or profiles.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={},
+                        ),
+                    ),
                 ]
-                for model_name in models_to_try:
-                    try:
-                        resp = self.client.models.generate_content(
-                            model=model_name,
-                            contents=contents_payload,
-                            config=types.GenerateContentConfig(
-                                system_instruction=system_instruction,
-                                temperature=0.7,
-                            ),
-                        )
-                        reply_text = clean_text_formatting(resp.text)
+            )
+        ]
+
+        system_instruction = f"""
+You are the Dispatch Autonomous Social Operator — an elite Head of Content and Technical Co-Pilot.
+
+USER BACKGROUND MEMORY (RAG & PERSISTENT CONTEXT):
+- User Name: {user_name}
+- Professional Niche & Identity: {user_niche}
+- Core Topics: Distributed Systems, Scalable Architectures, AI Agents, Engineering Automation, Modern Full-Stack Development
+- Target Audience: Tech founders, senior software engineers, system architects, AI builders
+- Tone: High-conviction, opinionated, witty, charismatic, and technical with zero corporate buzzword fluff.
+
+CONNECTED SOCIAL CHANNELS (DATABASE STATE):
+{profiles_str}
+
+CORE OPERATING PRINCIPLES:
+1. Tool Calling:
+   - When the user asks to write, draft, synthesize, enhance, compose, or creates a post (or provides raw notes from the composer), invoke `draft_post_plan`.
+   - When the user asks to publish or post directly to their live feeds, invoke `publish_post_to_social`.
+   - When the user explicitly asks about their accounts, handles, or connection status, invoke `get_connected_accounts_info`.
+   - For technical questions (system design, architecture trade-offs, code, career, debate), respond conversationally as an elite technical co-pilot.
+2. Background Memory:
+   - You ALREADY know who the user is from USER BACKGROUND MEMORY. DO NOT recite or list their profile, niche, or handles unless they explicitly ask for it!
+   - Every post you draft MUST reflect their real niche ({user_niche}) rather than generic business jargon.
+3. Clean Formatting:
+   - Format with clean GitHub markdown. Never use raw escaped backslashes like \\n or robotic asterisk prefixes (* **).
+"""
+
+        # Fast Tool-Calling Execution Loop
+        if self.client:
+            models_to_try = [
+                "gemini-3.1-flash-lite",
+                "gemini-2.5-pro",
+                "gemini-3-flash-preview",
+                "gemini-pro-latest",
+                "gemini-flash-latest",
+            ]
+            for model_name in models_to_try:
+                try:
+                    contents_payload: list = []
+                    if request.media_url:
+                        try:
+                            async with httpx.AsyncClient(timeout=10.0) as img_client:
+                                img_resp = await img_client.get(request.media_url)
+                                if img_resp.status_code == 200:
+                                    ctype = img_resp.headers.get("content-type") or "image/jpeg"
+                                    contents_payload.append(
+                                        types.Part.from_bytes(data=img_resp.content, mime_type=ctype)
+                                    )
+                        except Exception as img_err:
+                            logger.warning("Multimodal image fetch failed: %s", img_err)
+
+                    contents_payload.append(f"User Message: {user_msg}")
+                    if brand_voice_prompt:
+                        contents_payload.append(f"[Custom Brand Voice Persona]:\n{brand_voice_prompt}")
+
+                    response = self.client.models.generate_content(
+                        model=model_name,
+                        contents=contents_payload,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            tools=tools,
+                            temperature=0.4,
+                        ),
+                    )
+
+                    candidate = response.candidates[0]
+                    parts = candidate.content.parts if candidate and candidate.content else []
+
+                    # Check for tool/function calls
+                    for part in parts:
+                        if part.function_call:
+                            fn_name = part.function_call.name
+                            fn_args = part.function_call.args or {}
+                            logger.info("Agent invoked tool: %s with args: %s", fn_name, fn_args)
+
+                            if fn_name == "draft_post_plan":
+                                topic = fn_args.get("topic_or_draft") or user_msg
+                                gen_req = ContentGenerationRequest(
+                                    prompt=f"{topic} (Niche: {user_niche})",
+                                    workspace=request.workspace,
+                                )
+                                plan = await self.execute(gen_req, brand_voice_prompt=brand_voice_prompt)
+                                return CopilotChatResponse(
+                                    type="plan",
+                                    reply=f"Synthesized a multi-platform distribution plan tailored for your active channels and {user_niche} niche. Review, attach any media, and dispatch live below!",
+                                    plan=plan,
+                                    suggested_actions=["⚡ Make Punchier (<280)", "🎯 Stronger Hook", "📊 Add System Metrics"],
+                                )
+
+                            elif fn_name == "get_connected_accounts_info":
+                                reply_text = f"Here are your connected social accounts retrieved from Sentinel:\n\n{profiles_str}\n\nAll set and ready for autonomous dispatch! Would you like me to draft a post for one of these?"
+                                return CopilotChatResponse(
+                                    type="advice",
+                                    reply=reply_text,
+                                    plan=None,
+                                    suggested_actions=["Draft a LinkedIn post", "Draft an 𝕏 thread", "How to boost reach this week?"],
+                                )
+
+                            elif fn_name == "publish_post_to_social":
+                                target_plat = fn_args.get("platform", "linkedin")
+                                return CopilotChatResponse(
+                                    type="advice",
+                                    reply=f"Publishing initiated for {target_plat}.",
+                                    plan=None,
+                                    auto_dispatched=True,
+                                    published_platform=target_plat,
+                                )
+
+                    # If no function call, return conversational response
+                    text_parts = [p.text for p in parts if p.text]
+                    if text_parts:
+                        full_reply = clean_text_formatting(" ".join(text_parts))
                         return CopilotChatResponse(
                             type="advice",
-                            reply=reply_text,
+                            reply=full_reply,
                             plan=None,
                             suggested_actions=[
-                                "Draft LinkedIn Post on this",
-                                "Draft 𝕏 Thread",
-                                "Refine Strategic Hook",
+                                "Draft a technical post on this",
+                                "How to format this for LinkedIn?",
+                                "Check my connected accounts",
                             ],
                         )
-                    except Exception as e:
-                        logger.warning("Gemini model %s failed: %s", model_name, e)
-            except Exception as e:
-                logger.warning("Gemini chat failed (%s); using fallback response.", e)
+                except Exception as exc:
+                    logger.warning("Gemini model %s failed (%s); trying next model...", model_name, exc)
+                    continue
 
-        # Dynamic topic-tailored fallback
+        # Dynamic topic-tailored fallback if models are temporarily unavailable
         topic_clean = re.sub(r"^(what|how|why|tell\s+me|generate|write|draft|compose)\s+(is|about|regarding)?\s*", "", user_msg, flags=re.IGNORECASE).strip()
-        topic = topic_clean[:50] if topic_clean else "your topic"
+        topic = topic_clean[:50] if topic_clean else "system architecture"
+
+        # If user explicitly asked to draft or enhance
+        if any(w in user_msg_lower for w in ["draft", "write", "post", "enhance", "compose", "sharding"]):
+            gen_req = ContentGenerationRequest(prompt=f"{topic} (Niche: {user_niche})", workspace=request.workspace)
+            plan = self._generate_deterministic_fallback(gen_req)
+            return CopilotChatResponse(
+                type="plan",
+                reply=f"Generated an architectural distribution plan focused on {topic} for your engineering niche.",
+                plan=plan,
+                suggested_actions=["⚡ Make Punchier (<280)", "🎯 Stronger Hook", "📊 Add System Metrics"],
+            )
+
         fallback_reply = (
-            f"Here is the tactical takeaway on **{topic}**:\n\n"
-            f"• **The Core Trade-off**: High-scale systems and distribution are all about leverage. Don't optimize the edge cases before the core engine is solid.\n"
-            f"• **Algorithmic Edge**: On LinkedIn, lead with a strong counter-intuitive truth. On 𝕏, keep it dense with high signal.\n\n"
+            f"Here is the architectural takeaway on **{topic}**:\n\n"
+            f"• **The Core Trade-off**: At scale, premature optimization hurts velocity. Keep boundaries clean and establish clear query patterns before sharding or decoupling.\n"
+            f"• **Distribution Strategy**: On LinkedIn, lead with a strong counter-intuitive engineering truth. On 𝕏, keep it dense with high signal.\n\n"
             f"Want me to draft a dedicated post or multi-platform thread on this right now?"
         )
         return CopilotChatResponse(
