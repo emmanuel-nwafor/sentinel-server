@@ -237,12 +237,17 @@ class YouTubePublisher(BaseSocialPublisher):
             if not upload_location:
                 raise SocialPublishError("YouTube upload endpoint did not return an upload location.")
 
-            # 2. Download video stream/bytes from media storage
-            vid_stream_resp = await client.get(video_url)
-            if vid_stream_resp.status_code >= 400:
-                raise SocialPublishError(f"Failed to retrieve video asset for YouTube upload ({vid_stream_resp.status_code})")
-
-            video_bytes = vid_stream_resp.content
+            # 2. Download video stream/bytes from media storage or read from local disk
+            from pathlib import Path
+            local_filename = video_url.split("/static/uploads/")[-1] if "/static/uploads/" in video_url else None
+            local_path = (Path("static/uploads") / local_filename) if local_filename else None
+            if local_path and local_path.exists():
+                video_bytes = local_path.read_bytes()
+            else:
+                vid_stream_resp = await client.get(video_url)
+                if vid_stream_resp.status_code >= 400:
+                    raise SocialPublishError(f"Failed to retrieve video asset for YouTube upload ({vid_stream_resp.status_code})")
+                video_bytes = vid_stream_resp.content
 
             # 3. Stream binary video bytes into YouTube resumable upload location
             put_resp = await client.put(

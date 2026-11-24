@@ -237,17 +237,37 @@ class LinkedInPublisher(BaseSocialPublisher):
     ) -> str:
         """
         LinkedIn 3-step video upload:
-        1) Initialize video upload slot via POST /rest/videos?action=initializeUpload.
-        2) Read video bytes from storage or local disk.
+        1) Read/download binary video bytes from storage or local disk to determine exact size.
+        2) Initialize video upload slot via POST /rest/videos?action=initializeUpload with fileSizeBytes.
         3) PUT binary video payload directly to presigned uploadUrl (NO Authorization header).
+        4) Finalize video upload via POST /rest/videos?action=finalizeUpload.
         """
+        # 1. Read video bytes first so we know exact fileSizeBytes
+        local_filename = video_url.split("/static/uploads/")[-1] if "/static/uploads/" in video_url else None
+        local_path = (Path("static/uploads") / local_filename) if local_filename else None
+        if local_path and local_path.exists():
+            video_bytes = local_path.read_bytes()
+            content_type = "video/mp4"
+        else:
+            video_bytes, content_type = await self._download_media_bytes(video_url)
+
+        file_size_bytes = len(video_bytes)
         versions = candidate_versions or [settings.LINKEDIN_API_VERSION or "202611"]
+
+        # 2. Initialize video upload slot
         init_resp = None
         for ver in versions:
             init_resp = await client.post(
                 self.VIDEOS_API_URL,
                 headers=self._rest_headers(access_token, version=ver),
-                json={"initializeUploadRequest": {"owner": owner_urn}},
+                json={
+                    "initializeUploadRequest": {
+                        "owner": owner_urn,
+                        "fileSizeBytes": file_size_bytes,
+                        "uploadCaptions": False,
+                        "uploadThumbnail": False,
+                    }
+                },
             )
             if init_resp.status_code == 426 and "NONEXISTENT_VERSION" in init_resp.text:
                 continue
@@ -261,21 +281,13 @@ class LinkedInPublisher(BaseSocialPublisher):
         value = init_resp.json().get("value", {})
         instructions = value.get("uploadInstructions", [])
         video_urn = value.get("video")
+        upload_token = value.get("uploadToken") or ""
         if not instructions or not video_urn:
             raise SocialPublishError("LinkedIn video init response missing uploadInstructions or video URN.")
 
         upload_url = instructions[0].get("uploadUrl")
 
-        # Check local file or download from URL
-        local_filename = video_url.split("/static/uploads/")[-1] if "/static/uploads/" in video_url else None
-        local_path = (Path("static/uploads") / local_filename) if local_filename else None
-        if local_path and local_path.exists():
-            video_bytes = local_path.read_bytes()
-            content_type = "video/mp4"
-        else:
-            video_bytes, content_type = await self._download_media_bytes(video_url)
-
-        # Pre-signed S3 upload: DO NOT pass Authorization header
+        # 3. Pre-signed S3 upload: DO NOT pass Authorization header
         put_resp = await client.put(
             upload_url,
             content=video_bytes,
@@ -287,6 +299,29 @@ class LinkedInPublisher(BaseSocialPublisher):
             raise SocialPublishError(
                 f"LinkedIn binary video upload failed ({put_resp.status_code}): {put_resp.text}"
             )
+
+        etag = put_resp.headers.get("etag") or put_resp.headers.get("ETag") or ""
+        etag_clean = etag.strip('"')
+
+        # 4. Finalize video upload with LinkedIn Videos API
+        finalize_url = "https://api.linkedin.com/rest/videos?action=finalizeUpload"
+        for ver in versions:
+            fin_resp = await client.post(
+                finalize_url,
+                headers=self._rest_headers(access_token, version=ver),
+                json={
+                    "finalizeUploadRequest": {
+                        "video": video_urn,
+                        "uploadToken": upload_token,
+                        "uploadedPartIds": [etag_clean] if etag_clean else [],
+                    }
+                },
+            )
+            if fin_resp.status_code == 426 and "NONEXISTENT_VERSION" in fin_resp.text:
+                continue
+            break
+
+        logger.info("LinkedIn video asset initialized and finalized: %s", video_urn)
         return video_urn
 
     async def publish(
