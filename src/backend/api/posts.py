@@ -747,8 +747,45 @@ async def list_post_comments(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    meta = post.metadata_info or {}
-    comments_data = meta.get("audience_comments", [])
+    meta = dict(post.metadata_info or {})
+    comments_data = list(meta.get("audience_comments", []))
+
+    # Live sync from LinkedIn Social Actions API if post has remote_post_id on LinkedIn
+    remote_post_id = meta.get("remote_post_id") or meta.get("published_url")
+    is_linkedin = (
+        meta.get("published_platform") == "linkedin"
+        or "linkedin" in (post.target_platforms or [])
+        or (remote_post_id and "urn:li:" in str(remote_post_id))
+    )
+
+    if is_linkedin and remote_post_id:
+        try:
+            li_acc = await uow.social_accounts.get_by_user_and_platform(current_user.id, "linkedin")
+            if li_acc and li_acc.access_token:
+                from backend.tools.publishers.linkedin import LinkedInPublisher
+                li_pub = LinkedInPublisher()
+                live_comments = await li_pub.fetch_comments(li_acc.access_token, str(remote_post_id))
+                if live_comments:
+                    existing_ids = {c.get("id") for c in comments_data}
+                    for lc in live_comments:
+                        if lc["id"] not in existing_ids:
+                            comments_data.append(lc)
+                    meta["audience_comments"] = comments_data
+                    meta["comments_count"] = len(comments_data)
+
+                # Sync reactions / likes
+                actions = await li_pub.fetch_social_actions(li_acc.access_token, str(remote_post_id))
+                if actions and "total_likes" in actions:
+                    meta["likes_count"] = max(meta.get("likes_count", 0), actions["total_likes"])
+                    if actions.get("is_liked"):
+                        meta["is_liked"] = True
+
+                post.metadata_info = meta
+                await uow.commit()
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Failed to sync live LinkedIn comments: %s", exc)
+
     return comments_data
 
 
@@ -828,6 +865,40 @@ async def add_post_comment(
     meta["audience_comments"] = comments_list
     meta["comments_count"] = meta.get("comments_count", 0) + 1
     post.metadata_info = meta
+
+    # Live dispatch to LinkedIn if post was published to LinkedIn
+    remote_post_id = meta.get("remote_post_id") or meta.get("published_url")
+    is_linkedin = (
+        meta.get("published_platform") == "linkedin"
+        or "linkedin" in (post.target_platforms or [])
+        or (remote_post_id and "urn:li:" in str(remote_post_id))
+    )
+    if is_linkedin and remote_post_id:
+        try:
+            li_acc = await uow.social_accounts.get_by_user_and_platform(current_user.id, "linkedin")
+            if li_acc and li_acc.access_token:
+                from backend.tools.publishers.linkedin import LinkedInPublisher
+                author_urn = (
+                    li_acc.platform_account_id
+                    if li_acc.platform_account_id.startswith("urn:li:")
+                    else f"urn:li:person:{li_acc.platform_account_id}"
+                )
+                li_pub = LinkedInPublisher()
+                parent_urn = (
+                    payload.parent_comment_id
+                    if (payload.parent_comment_id and "urn:li:" in payload.parent_comment_id)
+                    else None
+                )
+                await li_pub.create_comment(
+                    access_token=li_acc.access_token,
+                    author_urn=author_urn,
+                    post_urn=str(remote_post_id),
+                    text=payload.content,
+                    parent_comment_urn=parent_urn,
+                )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Failed to dispatch live comment to LinkedIn: %s", exc)
 
     await uow.commit()
     return new_comment
@@ -1049,8 +1120,45 @@ async def list_post_comments(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    meta = post.metadata_info or {}
-    comments_data = meta.get("audience_comments", [])
+    meta = dict(post.metadata_info or {})
+    comments_data = list(meta.get("audience_comments", []))
+
+    # Live sync from LinkedIn Social Actions API if post has remote_post_id on LinkedIn
+    remote_post_id = meta.get("remote_post_id") or meta.get("published_url")
+    is_linkedin = (
+        meta.get("published_platform") == "linkedin"
+        or "linkedin" in (post.target_platforms or [])
+        or (remote_post_id and "urn:li:" in str(remote_post_id))
+    )
+
+    if is_linkedin and remote_post_id:
+        try:
+            li_acc = await uow.social_accounts.get_by_user_and_platform(current_user.id, "linkedin")
+            if li_acc and li_acc.access_token:
+                from backend.tools.publishers.linkedin import LinkedInPublisher
+                li_pub = LinkedInPublisher()
+                live_comments = await li_pub.fetch_comments(li_acc.access_token, str(remote_post_id))
+                if live_comments:
+                    existing_ids = {c.get("id") for c in comments_data}
+                    for lc in live_comments:
+                        if lc["id"] not in existing_ids:
+                            comments_data.append(lc)
+                    meta["audience_comments"] = comments_data
+                    meta["comments_count"] = len(comments_data)
+
+                # Sync reactions / likes
+                actions = await li_pub.fetch_social_actions(li_acc.access_token, str(remote_post_id))
+                if actions and "total_likes" in actions:
+                    meta["likes_count"] = max(meta.get("likes_count", 0), actions["total_likes"])
+                    if actions.get("is_liked"):
+                        meta["is_liked"] = True
+
+                post.metadata_info = meta
+                await uow.commit()
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Failed to sync live LinkedIn comments: %s", exc)
+
     return comments_data
 
 
@@ -1130,6 +1238,40 @@ async def add_post_comment(
     meta["audience_comments"] = comments_list
     meta["comments_count"] = meta.get("comments_count", 0) + 1
     post.metadata_info = meta
+
+    # Live dispatch to LinkedIn if post was published to LinkedIn
+    remote_post_id = meta.get("remote_post_id") or meta.get("published_url")
+    is_linkedin = (
+        meta.get("published_platform") == "linkedin"
+        or "linkedin" in (post.target_platforms or [])
+        or (remote_post_id and "urn:li:" in str(remote_post_id))
+    )
+    if is_linkedin and remote_post_id:
+        try:
+            li_acc = await uow.social_accounts.get_by_user_and_platform(current_user.id, "linkedin")
+            if li_acc and li_acc.access_token:
+                from backend.tools.publishers.linkedin import LinkedInPublisher
+                author_urn = (
+                    li_acc.platform_account_id
+                    if li_acc.platform_account_id.startswith("urn:li:")
+                    else f"urn:li:person:{li_acc.platform_account_id}"
+                )
+                li_pub = LinkedInPublisher()
+                parent_urn = (
+                    payload.parent_comment_id
+                    if (payload.parent_comment_id and "urn:li:" in payload.parent_comment_id)
+                    else None
+                )
+                await li_pub.create_comment(
+                    access_token=li_acc.access_token,
+                    author_urn=author_urn,
+                    post_urn=str(remote_post_id),
+                    text=payload.content,
+                    parent_comment_urn=parent_urn,
+                )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Failed to dispatch live comment to LinkedIn: %s", exc)
 
     await uow.commit()
     return new_comment

@@ -385,6 +385,133 @@ class LinkedInPublisher(BaseSocialPublisher):
             if last_error:
                 raise SocialPublishError(last_error)
 
+    async def fetch_comments(
+        self, access_token: str, post_urn: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch comments on a LinkedIn post via LinkedIn Social Actions API.
+        GET /rest/socialActions/{encodedUrn}/comments
+        """
+        from urllib.parse import quote
+        encoded_urn = quote(post_urn, safe="")
+        url = f"https://api.linkedin.com/rest/socialActions/{encoded_urn}/comments"
+        comments: List[Dict[str, Any]] = []
+
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.get(
+                    url,
+                    headers=self._rest_headers(access_token),
+                    params={"count": 50},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    elements = data.get("elements", [])
+                    for el in elements:
+                        comment_id = el.get("id") or el.get("$URN") or f"c_{self._timestamp_id()}"
+                        actor = el.get("actor", "urn:li:person:unknown")
+                        actor_id = actor.split(":")[-1] if ":" in actor else "user"
+                        msg_obj = el.get("message", {})
+                        text = msg_obj.get("text", "") if isinstance(msg_obj, dict) else str(msg_obj)
+                        likes_summary = el.get("likesSummary", {})
+
+                        created_ms = el.get("created", {}).get("time")
+                        time_str = "Recently"
+                        if created_ms:
+                            try:
+                                dt = datetime.fromtimestamp(created_ms / 1000.0, timezone.utc)
+                                diff = (datetime.now(timezone.utc) - dt).total_seconds()
+                                if diff < 3600:
+                                    time_str = f"{max(1, int(diff // 60))}m ago"
+                                elif diff < 86400:
+                                    time_str = f"{int(diff // 3600)}h ago"
+                                else:
+                                    time_str = f"{int(diff // 86400)}d ago"
+                            except Exception:
+                                pass
+
+                        comments.append({
+                            "id": comment_id,
+                            "author_name": f"LinkedIn User ({actor_id[:6]})",
+                            "author_handle": f"@{actor_id[:10]}",
+                            "avatar_text": "L",
+                            "time_ago": time_str,
+                            "content": text,
+                            "likes_count": likes_summary.get("totalLikes", 0),
+                            "is_liked": likes_summary.get("likedByCurrentUser", False),
+                            "is_replied": False,
+                            "user_reply_text": None,
+                            "replies": [],
+                        })
+        except Exception as e:
+            logger.warning("Failed to fetch LinkedIn comments for %s: %s", post_urn, e)
+
+        return comments
+
+    async def fetch_social_actions(
+        self, access_token: str, post_urn: str
+    ) -> Dict[str, Any]:
+        """
+        Fetch likes count and comments count via LinkedIn Social Actions API.
+        GET /rest/socialActions/{encodedUrn}
+        """
+        from urllib.parse import quote
+        encoded_urn = quote(post_urn, safe="")
+        url = f"https://api.linkedin.com/rest/socialActions/{encoded_urn}"
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(url, headers=self._rest_headers(access_token))
+                if resp.status_code == 200:
+                    data = resp.json()
+                    likes_summary = data.get("likesSummary", {})
+                    comments_summary = data.get("commentsSummary", {})
+                    return {
+                        "total_likes": likes_summary.get("totalLikes", 0),
+                        "is_liked": likes_summary.get("likedByCurrentUser", False),
+                        "total_comments": comments_summary.get("totalComments", 0),
+                    }
+        except Exception as e:
+            logger.warning("Failed to fetch LinkedIn social actions for %s: %s", post_urn, e)
+        return {}
+
+    async def create_comment(
+        self,
+        access_token: str,
+        author_urn: str,
+        post_urn: str,
+        text: str,
+        parent_comment_urn: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Post a comment or reply to a LinkedIn post via LinkedIn Social Actions API.
+        POST /rest/socialActions/{encodedUrn}/comments
+        """
+        from urllib.parse import quote
+        encoded_urn = quote(post_urn, safe="")
+        url = f"https://api.linkedin.com/rest/socialActions/{encoded_urn}/comments"
+
+        payload: Dict[str, Any] = {
+            "actor": author_urn,
+            "message": {"text": text.strip()},
+        }
+        if parent_comment_urn:
+            payload["parentComment"] = parent_comment_urn
+
+        try:
+            async with httpx.AsyncClient(timeout=25.0) as client:
+                resp = await client.post(
+                    url,
+                    headers=self._rest_headers(access_token),
+                    json=payload,
+                )
+                if resp.status_code in (200, 201):
+                    return resp.headers.get("x-restli-id") or f"urn:li:comment:{self._timestamp_id()}"
+                else:
+                    logger.warning("LinkedIn comment create returned %s: %s", resp.status_code, resp.text)
+        except Exception as e:
+            logger.warning("Failed to dispatch LinkedIn comment: %s", e)
+        return None
+
     async def delete_post(
         self,
         account: SocialAccountModel,

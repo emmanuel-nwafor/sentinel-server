@@ -173,8 +173,14 @@ class YouTubePublisher(BaseSocialPublisher):
         return None
 
     def validate_content(self, text: str, media: Optional[Dict[str, Any]] = None) -> None:
-        if not text and not media:
-            raise SocialPublishError("YouTube content requires text or media.")
+        if not media or not media.get("url"):
+            raise SocialPublishError(
+                "YouTube publishes video broadcasts. A video file must be attached."
+            )
+        if media.get("type") and media.get("type") != "video":
+            raise SocialPublishError(
+                "YouTube only accepts video formats (.mp4, .mov, etc.). Image upload is not supported on standard channels."
+            )
 
     async def publish(
         self,
@@ -184,18 +190,85 @@ class YouTubePublisher(BaseSocialPublisher):
         media: Optional[Dict[str, Any]] = None,
     ) -> PlatformPublishResult:
         self.validate_content(text, media)
-        channel_id = account.platform_account_id
-        live_url = (
-            f"https://www.youtube.com/channel/{channel_id}"
-            if channel_id
-            else "https://www.youtube.com"
-        )
-        return PlatformPublishResult(
-            platform=SocialPlatform.YOUTUBE,
-            success=True,
-            remote_post_id=f"yt_{int(datetime.now(timezone.utc).timestamp())}",
-            live_url=live_url,
-        )
+
+        if account.is_sandbox:
+            vid_id = f"yt_{self._timestamp_id('sandbox')}"
+            return self._build_sandbox_result(
+                remote_post_id=vid_id,
+                post_url=f"https://www.youtube.com/watch?v={vid_id}",
+            )
+
+        video_url = media["url"]
+        # Extract title from text or fallback
+        lines = [line.strip() for line in (text or "").split("\n") if line.strip()]
+        video_title = lines[0][:100] if lines else "New Video Broadcast"
+        video_description = "\n".join(lines[1:]) if len(lines) > 1 else text
+
+        upload_init_url = "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status"
+        metadata = {
+            "snippet": {
+                "title": video_title,
+                "description": video_description,
+                "categoryId": "22",  # People & Blogs
+            },
+            "status": {
+                "privacyStatus": "public",
+                "selfDeclaredMadeForKids": False,
+            },
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            # 1. Initialize resumable video upload session with YouTube Data API v3
+            init_resp = await client.post(
+                upload_init_url,
+                json=metadata,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json; charset=UTF-8",
+                    "X-Upload-Content-Type": "video/mp4",
+                },
+            )
+
+            if init_resp.status_code not in (200, 201):
+                logger.error("YouTube upload session creation failed (%s): %s", init_resp.status_code, init_resp.text)
+                raise SocialPublishError(f"YouTube upload initialization failed ({init_resp.status_code}): {init_resp.text}")
+
+            upload_location = init_resp.headers.get("Location")
+            if not upload_location:
+                raise SocialPublishError("YouTube upload endpoint did not return an upload location.")
+
+            # 2. Download video stream/bytes from media storage
+            vid_stream_resp = await client.get(video_url)
+            if vid_stream_resp.status_code >= 400:
+                raise SocialPublishError(f"Failed to retrieve video asset for YouTube upload ({vid_stream_resp.status_code})")
+
+            video_bytes = vid_stream_resp.content
+
+            # 3. Stream binary video bytes into YouTube resumable upload location
+            put_resp = await client.put(
+                upload_location,
+                content=video_bytes,
+                headers={
+                    "Content-Type": "video/mp4",
+                    "Content-Length": str(len(video_bytes)),
+                },
+            )
+
+            if put_resp.status_code in (200, 201):
+                res_data = put_resp.json()
+                video_id = res_data.get("id") or f"yt_{int(datetime.now(timezone.utc).timestamp())}"
+                live_url = f"https://www.youtube.com/watch?v={video_id}"
+                logger.info("Successfully published video to YouTube! ID: %s, URL: %s", video_id, live_url)
+                return PlatformPublishResult(
+                    platform=SocialPlatform.YOUTUBE,
+                    success=True,
+                    remote_post_id=video_id,
+                    live_url=live_url,
+                    published_at=datetime.now(timezone.utc),
+                )
+            else:
+                logger.error("YouTube binary video upload failed (%s): %s", put_resp.status_code, put_resp.text)
+                raise SocialPublishError(f"YouTube binary video upload failed ({put_resp.status_code}): {put_resp.text}")
 
     async def delete_post(
         self,
