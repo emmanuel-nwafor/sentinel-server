@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     )
     META_GRAPH_API_VERSION: str = "v21.0"
 
-    YOUTUBE_CLIENT_ID: str = ""
+    YOUTUBE_CLIENT_ID: str = "1059756645949-1ven5m8ive67ljlcbsu2qu5tv20c9bcr.apps.googleusercontent.com"
     YOUTUBE_CLIENT_SECRET: str = ""
     YOUTUBE_REDIRECT_URI: str = (
         "https://dispatch-6mlh.onrender.com/api/v1/social/callback/youtube"

@@ -40,41 +40,6 @@ class UserBrandProfileResponse(BaseModel):
     source_type: str
 
 
-# Emmanuel's verified profile default seed
-DEFAULT_EMMANUEL_ABOUT = (
-    "Currently contributing to Appfur Mobile App Developer as a Fullstack Developer, "
-    "focusing on building, optimizing, scaling, and maintaining projects. Collaborates with "
-    "teams to deliver robust solutions for dynamic application requirements. Also provides "
-    "mentorship and guidance as a Frontend Developer at Enugu State University of Science and "
-    "Technology, fostering growth in emerging talent.\n\n"
-    "Pursuing a Bachelor of Engineering in Electrical and Electronics Engineering at Enugu State "
-    "University of Science and Technology, expected to graduate in 2026. With a strong foundation "
-    "in full stack development, back end operations, and database management, dedicated to creating "
-    "scalable, user-focused applications that merge functionality with design."
-)
-
-DEFAULT_EMMANUEL_PROFILE = {
-    "full_name": "Emmanuel Chinecherem",
-    "headline": "Software Engineer at Foremade",
-    "about": DEFAULT_EMMANUEL_ABOUT,
-    "niche": "Fullstack & Mobile Engineering, Scalable Cloud Systems, High-Performance Web & App Development",
-    "target_audience": "Tech founders, engineering leaders, senior developers, recruiters",
-    "tone": "High-signal, authoritative, technical, clear, pragmatic",
-    "core_topics": [
-        "Fullstack Architecture & API Design",
-        "Mobile App Engineering (React Native & Expo)",
-        "Backend Scaling, Optimization & Database Management",
-        "Frontend State & Fluid 60fps Micro-Interactions",
-        "Mentorship & Engineering Best Practices",
-    ],
-    "skills": ["React.js", "JavaScript", "Git", "Front-End Development", "Back-End Web Development"],
-    "current_company": "Foremade / Appfur",
-    "education": "B.Eng in Electrical & Electronics Engineering, Enugu State University of Science & Technology (2026)",
-    "linkedin_url": "https://www.linkedin.com/in/emmanuel-chinecherem/",
-    "source_type": "linkedin_profile",
-}
-
-
 async def _extract_brand_context_with_llm(raw_text: str) -> dict:
     """Extract structured brand profile from raw pasted LinkedIn, CV, or bio text using Gemini."""
     client = None
@@ -163,23 +128,38 @@ async def get_user_brand_context(
     """Retrieve the unified persistent User Brand Profile from PostgreSQL."""
     profile = await uow.brand_profiles.get_by_user(current_user.id)
     if not profile:
-        # Seed default profile for Emmanuel
-        profile = await uow.brand_profiles.upsert_profile(
-            user_id=current_user.id,
-            full_name=current_user.name or DEFAULT_EMMANUEL_PROFILE["full_name"],
-            headline=DEFAULT_EMMANUEL_PROFILE["headline"],
-            about=DEFAULT_EMMANUEL_PROFILE["about"],
-            niche=DEFAULT_EMMANUEL_PROFILE["niche"],
-            target_audience=DEFAULT_EMMANUEL_PROFILE["target_audience"],
-            tone=DEFAULT_EMMANUEL_PROFILE["tone"],
-            core_topics=DEFAULT_EMMANUEL_PROFILE["core_topics"],
-            skills=DEFAULT_EMMANUEL_PROFILE["skills"],
-            current_company=DEFAULT_EMMANUEL_PROFILE["current_company"],
-            education=DEFAULT_EMMANUEL_PROFILE["education"],
-            linkedin_url=DEFAULT_EMMANUEL_PROFILE["linkedin_url"],
-            source_type=DEFAULT_EMMANUEL_PROFILE["source_type"],
+        # Check if user has connected accounts to infer basic identity
+        social_accs = await uow.social_accounts.list_by_user(current_user.id)
+        li_acc = next((a for a in social_accs if a.platform == "linkedin"), None)
+        x_acc = next((a for a in social_accs if a.platform == "x"), None)
+
+        user_display_name = (
+            current_user.name
+            or (li_acc.account_name if li_acc else None)
+            or (x_acc.account_name if x_acc else None)
+            or "Creator"
         )
-        await uow.commit()
+        headline = getattr(li_acc, "headline", "") if li_acc else ""
+        li_url = (
+            f"https://www.linkedin.com/in/{li_acc.account_handle}"
+            if li_acc and li_acc.account_handle
+            else None
+        )
+
+        return UserBrandProfileResponse(
+            full_name=user_display_name,
+            headline=headline or "",
+            about="",
+            niche="General Content Strategy",
+            target_audience="Target professional audience",
+            tone="Authentic, engaging, high-signal",
+            core_topics=[],
+            skills=[],
+            current_company=None,
+            education=None,
+            linkedin_url=li_url,
+            source_type="unconfigured",
+        )
 
     return UserBrandProfileResponse(
         full_name=profile.full_name,

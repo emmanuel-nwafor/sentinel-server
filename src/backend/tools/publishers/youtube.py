@@ -42,10 +42,14 @@ class YouTubePublisher(BaseSocialPublisher):
         return bool(settings.YOUTUBE_CLIENT_ID and settings.YOUTUBE_CLIENT_SECRET)
 
     def build_authorization_url(self, state: str, redirect_uri: Optional[str] = None) -> str:
+        client_id = (
+            settings.YOUTUBE_CLIENT_ID
+            or "1059756645949-1ven5m8ive67ljlcbsu2qu5tv20c9bcr.apps.googleusercontent.com"
+        )
         target_redirect = redirect_uri or settings.YOUTUBE_REDIRECT_URI
         params = {
             "response_type": "code",
-            "client_id": settings.YOUTUBE_CLIENT_ID,
+            "client_id": client_id,
             "redirect_uri": target_redirect,
             "state": state,
             "scope": " ".join(self.DEFAULT_SCOPES),

@@ -130,43 +130,34 @@ async def copilot_chat(
     brand_profile = None
     try:
         brand_profile = await uow.brand_profiles.get_by_user(current_user.id)
-        if not brand_profile:
-            from backend.api.profile import DEFAULT_EMMANUEL_PROFILE
-            brand_profile = await uow.brand_profiles.upsert_profile(
-                user_id=current_user.id,
-                full_name=current_user.name or DEFAULT_EMMANUEL_PROFILE["full_name"],
-                headline=DEFAULT_EMMANUEL_PROFILE["headline"],
-                about=DEFAULT_EMMANUEL_PROFILE["about"],
-                niche=DEFAULT_EMMANUEL_PROFILE["niche"],
-                target_audience=DEFAULT_EMMANUEL_PROFILE["target_audience"],
-                tone=DEFAULT_EMMANUEL_PROFILE["tone"],
-                core_topics=DEFAULT_EMMANUEL_PROFILE["core_topics"],
-                skills=DEFAULT_EMMANUEL_PROFILE["skills"],
-                current_company=DEFAULT_EMMANUEL_PROFILE["current_company"],
-                education=DEFAULT_EMMANUEL_PROFILE["education"],
-                linkedin_url=DEFAULT_EMMANUEL_PROFILE["linkedin_url"],
-                source_type=DEFAULT_EMMANUEL_PROFILE["source_type"],
-            )
-            await uow.commit()
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning("Failed to resolve brand profile: %s", exc)
 
     user_context = {
-        "name": brand_profile.full_name if brand_profile else (current_user.name or "Emmanuel Chinecherem"),
+        "name": (brand_profile.full_name if brand_profile else None)
+        or current_user.name
+        or (linkedin_acc["account_name"] if linkedin_acc else None)
+        or (x_acc["account_name"] if x_acc else None)
+        or "Creator",
         "email": current_user.email,
-        "headline": brand_profile.headline if brand_profile else "Software Engineer at Foremade",
+        "headline": brand_profile.headline if brand_profile else "",
         "about": brand_profile.about if brand_profile else "",
-        "niche": brand_profile.niche if brand_profile else "Fullstack & Mobile Engineering, Scalable Cloud Architectures",
-        "skills": brand_profile.skills if brand_profile else ["React.js", "JavaScript", "Git", "Front-End Development", "Back-End Web Development"],
+        "niche": brand_profile.niche if brand_profile else "General Content Strategy",
+        "skills": brand_profile.skills if brand_profile else [],
         "core_topics": brand_profile.core_topics if brand_profile else [],
-        "current_company": brand_profile.current_company if brand_profile else "Foremade / Appfur",
-        "education": brand_profile.education if brand_profile else "B.Eng in Electrical & Electronics Engineering at ESUT (2026)",
-        "linkedin_name": linkedin_acc["account_name"] if linkedin_acc else "Emmanuel Chinecherem",
-        "linkedin_handle": linkedin_acc["account_handle"] if linkedin_acc else "@emmanuel-chinecherem",
-        "linkedin_url": brand_profile.linkedin_url if brand_profile else "https://www.linkedin.com/in/emmanuel-chinecherem/",
-        "x_name": x_acc["account_name"] if x_acc else "E M S T A C K",
-        "x_handle": x_acc["account_handle"] if x_acc else "@EMSTACK",
+        "current_company": brand_profile.current_company if brand_profile else "",
+        "education": brand_profile.education if brand_profile else "",
+        "linkedin_name": linkedin_acc["account_name"] if linkedin_acc else "",
+        "linkedin_handle": linkedin_acc["account_handle"] if linkedin_acc else "",
+        "linkedin_url": (brand_profile.linkedin_url if brand_profile else "")
+        or (
+            f"https://www.linkedin.com/in/{linkedin_acc['account_handle']}"
+            if linkedin_acc and linkedin_acc.get("account_handle")
+            else ""
+        ),
+        "x_name": x_acc["account_name"] if x_acc else "",
+        "x_handle": x_acc["account_handle"] if x_acc else "",
     }
 
     res = await agent.chat(

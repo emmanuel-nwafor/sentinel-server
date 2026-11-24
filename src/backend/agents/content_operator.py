@@ -83,8 +83,8 @@ class ContentOperatorAgent:
             profiles_desc.append(f"• {plat}: {name} ({handle}) — [{active}]")
         profiles_str = "\n".join(profiles_desc) if profiles_desc else "No connected accounts found."
 
-        user_name = (user_context or {}).get("name") or "Emmanuel Onyekachi"
-        user_niche = (user_context or {}).get("niche") or "Software Engineer, AI Engineer, AI Automation & Scalable Architecture"
+        user_name = (user_context or {}).get("name") or "Creator"
+        user_niche = (user_context or {}).get("niche") or "General Content Strategy"
 
         # Agentic Architecture: Tools (Function Declarations)
         tools = [
@@ -154,28 +154,35 @@ class ContentOperatorAgent:
             )
         ]
 
-        headline = user_context.get("headline") or "Software Engineer at Foremade"
+        headline = user_context.get("headline") or ""
         about_summary = user_context.get("about") or ""
-        skills_str = ", ".join(user_context.get("skills") or ["React.js", "JavaScript", "Git", "Front-End Development", "Back-End Web Development"])
-        company = user_context.get("current_company") or "Foremade / Appfur"
-        edu = user_context.get("education") or "B.Eng in Electrical & Electronics Engineering at ESUT (2026)"
-        linkedin_url = user_context.get("linkedin_url") or "https://www.linkedin.com/in/emmanuel-chinecherem/"
+        skills_str = ", ".join(user_context.get("skills") or [])
+        company = user_context.get("current_company") or ""
+        edu = user_context.get("education") or ""
+        linkedin_url = user_context.get("linkedin_url") or ""
+        linkedin_name = user_context.get("linkedin_name") or ""
+        linkedin_handle = user_context.get("linkedin_handle") or ""
+        x_name = user_context.get("x_name") or ""
+        x_handle = user_context.get("x_handle") or ""
+
+        li_info = f"{linkedin_name} ({linkedin_handle})" if linkedin_handle else "Not connected"
+        x_info = f"{x_name} ({x_handle})" if x_handle else "Not connected"
 
         system_instruction = f"""
 You are the Dispatch Autonomous Social Operator — an elite Head of Content, System Architect, and Technical Co-Pilot.
 
 USER BACKGROUND MEMORY (STORED PROFILE IN DATABASE):
 - User Name: {user_name}
-- Headline: {headline}
-- Current Roles: {company}
-- Education: {edu}
+- Headline: {headline if headline else "Not specified yet"}
+- Current Roles: {company if company else "Not specified yet"}
+- Education: {edu if edu else "Not specified yet"}
 - Professional Niche: {user_niche}
-- Top Skills: {skills_str}
-- LinkedIn URL: {linkedin_url}
-- Verified LinkedIn Profile: Emmanuel Chinecherem (Handle: @emmanuel-chinecherem)
-- Verified 𝕏 Profile: E M S T A C K (Handle: @EMSTACK)
+- Top Skills: {skills_str if skills_str else "Not specified yet"}
+- LinkedIn URL: {linkedin_url if linkedin_url else "Not specified"}
+- Verified LinkedIn Profile: {li_info}
+- Verified 𝕏 Profile: {x_info}
 - About & Background:
-{about_summary}
+{about_summary if about_summary else "No bio stored yet."}
 
 CONNECTED SOCIAL CHANNELS (DATABASE STATE):
 {profiles_str}
@@ -269,30 +276,50 @@ CORE OPERATING PRINCIPLES:
                                 )
 
                             elif fn_name in ("get_user_brand_context", "get_linkedin_profile_details"):
-                                u_headline = user_context.get("headline") or "Software Engineer at Foremade"
+                                u_headline = user_context.get("headline") or ""
                                 u_about = user_context.get("about") or ""
-                                u_skills = ", ".join(user_context.get("skills") or ["React.js", "JavaScript", "Git", "Front-End Development", "Back-End Web Development"])
-                                u_company = user_context.get("current_company") or "Foremade / Appfur"
-                                u_edu = user_context.get("education") or "B.Eng in Electrical & Electronics Engineering at ESUT (2026)"
+                                u_skills = ", ".join(user_context.get("skills") or [])
+                                u_company = user_context.get("current_company") or ""
+                                u_edu = user_context.get("education") or ""
                                 u_niche = user_context.get("niche") or user_niche
 
-                                reply_text = (
-                                    f"Here is your verified profile and brand context retrieved from your database:\n\n"
-                                    f"• Name: {user_name}\n"
-                                    f"• Headline: {u_headline}\n"
-                                    f"• Current Roles: {u_company}\n"
-                                    f"• Education: {u_edu}\n"
-                                    f"• Core Niche: {u_niche}\n"
-                                    f"• Top Skills: {u_skills}\n\n"
-                                    f"About Summary:\n{u_about}\n\n"
-                                    f"Would you like me to draft a high-engagement thought leadership post for your LinkedIn network highlighting your work with React.js and fullstack systems?"
-                                )
+                                if not u_headline and not u_about and not u_skills:
+                                    reply_text = (
+                                        f"Here is your profile status retrieved from Dispatch:\n\n"
+                                        f"• Name: {user_name}\n"
+                                        f"• Connected Channels: {profiles_str}\n\n"
+                                        f"You haven't configured your detailed brand bio or professional context in the database yet.\n\n"
+                                        f"To personalize every post to your exact voice, you can connect your LinkedIn/𝕏 accounts or paste your headline and bio in Brand Profile.\n\n"
+                                        f"What would you like to draft or brainstorm today?"
+                                    )
+                                else:
+                                    details = [f"• Name: {user_name}"]
+                                    if u_headline:
+                                        details.append(f"• Headline: {u_headline}")
+                                    if u_company:
+                                        details.append(f"• Current Roles: {u_company}")
+                                    if u_edu:
+                                        details.append(f"• Education: {u_edu}")
+                                    if u_niche:
+                                        details.append(f"• Core Niche: {u_niche}")
+                                    if u_skills:
+                                        details.append(f"• Top Skills: {u_skills}")
+                                    if u_about:
+                                        details.append(f"\nAbout Summary:\n{u_about}")
+
+                                    details_str = "\n".join(details)
+                                    reply_text = (
+                                        f"Here is your verified brand context retrieved from your database:\n\n"
+                                        f"{details_str}\n\n"
+                                        f"Would you like me to draft a high-engagement thought leadership post for your network based on your background?"
+                                    )
+
                                 return CopilotChatResponse(
                                     type="advice",
                                     reply=clean_text_formatting(reply_text),
                                     plan=None,
                                     suggested_actions=[
-                                        "Draft a post on my fullstack experience",
+                                        "Draft a post on my experience",
                                         "Turn my About into a LinkedIn story",
                                         "Write an 𝕏 thread on my tech stack",
                                     ],
