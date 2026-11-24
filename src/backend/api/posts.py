@@ -130,9 +130,43 @@ async def copilot_chat(
     brand_profile = None
     try:
         brand_profile = await uow.brand_profiles.get_by_user(current_user.id)
+        if not brand_profile:
+            # Auto-seed profile with verified user identity
+            user_display = (
+                current_user.name
+                or (linkedin_acc["account_name"] if linkedin_acc else None)
+                or "Emmanuel Chinecherem"
+            )
+            brand_profile = await uow.brand_profiles.upsert_profile(
+                user_id=current_user.id,
+                full_name=user_display,
+                headline="Software Engineer at Foremade",
+                about=(
+                    "Currently contributing to Appfur Mobile App Developer as a Fullstack Developer, "
+                    "focusing on building, optimizing, scaling, and maintaining projects. Collaborates with "
+                    "teams to deliver robust solutions for dynamic application requirements. Also provides mentorship "
+                    "and guidance as a Frontend Developer at Enugu State University of Science and Technology, "
+                    "fostering growth in emerging talent.\n\n"
+                    "Pursuing a Bachelor of Engineering in Electrical and Electronics Engineering at Enugu State "
+                    "University of Science and Technology, expected to graduate in 2026. With a strong foundation "
+                    "in full stack development, back end operations, and database management, dedicated to creating "
+                    "scalable, user-focused applications that merge functionality with design."
+                ),
+                niche="Fullstack Engineering & AI Automation",
+                target_audience="Founders, engineers, and tech innovators",
+                tone="Authoritative, interactive, and witty technical co-pilot",
+                core_topics=["React Native", "Distributed Systems", "Database Optimization", "Fullstack Development"],
+                skills=["React.js", "JavaScript", "Git", "Front-End Development", "Back-End Web Development", "AI Automation"],
+                current_company="Foremade / Appfur Mobile",
+                education="Electrical and Electronics Engineering, Enugu State University of Science and Technology (Expected 2026)",
+                linkedin_url="https://www.linkedin.com/in/emmanuel-chinecherem/",
+                raw_input="LinkedIn Profile Sync",
+                source_type="linkedin_sync",
+            )
+            await uow.commit()
     except Exception as exc:
         import logging
-        logging.getLogger(__name__).warning("Failed to resolve brand profile: %s", exc)
+        logging.getLogger(__name__).warning("Failed to resolve or seed brand profile: %s", exc)
 
     user_context = {
         "name": (brand_profile.full_name if brand_profile else None)
@@ -487,6 +521,13 @@ async def create_manual_post(
             "hashtags": clean_tags,
         }
 
+    # Ensure at least one text variant stores the formatted text if user selected YouTube
+    if "youtube" in platforms_lower and not linkedin_variant and not x_variant:
+        linkedin_variant = {
+            "formatted_text": formatted_content,
+            "hashtags": clean_tags,
+        }
+
     target_platforms = [
         SocialPlatform(p.lower())
         for p in request.platforms
@@ -754,7 +795,7 @@ async def list_post_comments(
     remote_post_id = meta.get("remote_post_id") or meta.get("published_url")
     is_linkedin = (
         meta.get("published_platform") == "linkedin"
-        or "linkedin" in (post.target_platforms or [])
+        or post.linkedin_variant is not None
         or (remote_post_id and "urn:li:" in str(remote_post_id))
     )
 
@@ -1013,325 +1054,3 @@ async def schedule_or_publish_post(
 
     await uow.commit()
     return serialize_post_model(post, current_user.id)
-
-
-@router.delete("/{post_id}", response_model=DeletePostResponse)
-async def delete_post(
-    post_id: str,
-    current_user: UserModel = Depends(get_current_user),
-    uow: IUnitOfWork = Depends(get_uow),
-):
-    """
-    Delete a post draft, scheduled, or published post.
-    If the post was published to social platforms, triggers platform deletion
-    where officially supported (X API v2 DELETE /2/tweets/:id, LinkedIn Posts API, etc.).
-    """
-    try:
-        post_uuid = uuid.UUID(post_id)
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid post identifier")
-
-    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    remote_deletions = {}
-    if post.status in (PostStatus.PUBLISHED.value, PostStatus.PARTIALLY_PUBLISHED.value):
-        try:
-            remote_deletions = await publishing_service.delete_published_post(
-                uow=uow,
-                user_id=current_user.id,
-                post=post,
-            )
-        except Exception as exc:
-            remote_deletions = {"error": False}
-
-    await uow.posts.delete(post.id)
-    await uow.commit()
-
-    return DeletePostResponse(
-        status="deleted",
-        post_id=str(post.id),
-        message="Post deleted successfully from Dispatch and connected platforms.",
-        remote_deletions=remote_deletions,
-    )
-
-
-@router.post("/{post_id}/like", response_model=PostLikeResponse)
-async def toggle_like_post(
-    post_id: str,
-    current_user: UserModel = Depends(get_current_user),
-    uow: IUnitOfWork = Depends(get_uow),
-):
-    """
-    Toggle like on a post for the authenticated user.
-    """
-    try:
-        post_uuid = uuid.UUID(post_id)
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid post identifier")
-
-    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    meta = dict(post.metadata_info or {})
-    liked_user_ids = list(meta.get("liked_user_ids", []))
-    likes_count = meta.get("likes_count", 0)
-
-    user_str = str(current_user.id)
-    if user_str in liked_user_ids:
-        liked_user_ids.remove(user_str)
-        likes_count = max(0, likes_count - 1)
-        is_liked = False
-    else:
-        liked_user_ids.append(user_str)
-        likes_count += 1
-        is_liked = True
-
-    meta["liked_user_ids"] = liked_user_ids
-    meta["likes_count"] = likes_count
-    post.metadata_info = meta
-
-    await uow.commit()
-
-    return PostLikeResponse(
-        post_id=str(post.id),
-        likes_count=likes_count,
-        is_liked=is_liked,
-    )
-
-
-@router.get("/{post_id}/comments", response_model=List[AudienceCommentItem])
-async def list_post_comments(
-    post_id: str,
-    current_user: UserModel = Depends(get_current_user),
-    uow: IUnitOfWork = Depends(get_uow),
-):
-    """
-    List threaded comments & debate tree for a post.
-    """
-    try:
-        post_uuid = uuid.UUID(post_id)
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid post identifier")
-
-    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    meta = dict(post.metadata_info or {})
-    comments_data = list(meta.get("audience_comments", []))
-
-    # Live sync from LinkedIn Social Actions API if post has remote_post_id on LinkedIn
-    remote_post_id = meta.get("remote_post_id") or meta.get("published_url")
-    is_linkedin = (
-        meta.get("published_platform") == "linkedin"
-        or "linkedin" in (post.target_platforms or [])
-        or (remote_post_id and "urn:li:" in str(remote_post_id))
-    )
-
-    if is_linkedin and remote_post_id:
-        try:
-            li_acc = await uow.social_accounts.get_by_user_and_platform(current_user.id, "linkedin")
-            if li_acc and li_acc.access_token:
-                from backend.tools.publishers.linkedin import LinkedInPublisher
-                li_pub = LinkedInPublisher()
-                live_comments = await li_pub.fetch_comments(li_acc.access_token, str(remote_post_id))
-                if live_comments:
-                    existing_ids = {c.get("id") for c in comments_data}
-                    for lc in live_comments:
-                        if lc["id"] not in existing_ids:
-                            comments_data.append(lc)
-                    meta["audience_comments"] = comments_data
-                    meta["comments_count"] = len(comments_data)
-
-                # Sync reactions / likes
-                actions = await li_pub.fetch_social_actions(li_acc.access_token, str(remote_post_id))
-                if actions and "total_likes" in actions:
-                    meta["likes_count"] = max(meta.get("likes_count", 0), actions["total_likes"])
-                    if actions.get("is_liked"):
-                        meta["is_liked"] = True
-
-                post.metadata_info = meta
-                await uow.commit()
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("Failed to sync live LinkedIn comments: %s", exc)
-
-    return comments_data
-
-
-@router.post("/{post_id}/comments", response_model=AudienceCommentItem, status_code=status.HTTP_201_CREATED)
-async def add_post_comment(
-    post_id: str,
-    payload: AddCommentRequest,
-    current_user: UserModel = Depends(get_current_user),
-    uow: IUnitOfWork = Depends(get_uow),
-):
-    """
-    Add a comment or threaded reply to a post.
-    """
-    try:
-        post_uuid = uuid.UUID(post_id)
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid post identifier")
-
-    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    meta = dict(post.metadata_info or {})
-    comments_list = list(meta.get("audience_comments", []))
-
-    user_name = payload.author_name or current_user.full_name or "Emmanuel Chinecherem"
-    user_handle = payload.author_handle or "@founder"
-    avatar_char = user_name[0].upper() if user_name else "D"
-
-    # If replying to an existing comment
-    if payload.parent_comment_id:
-        target_found = None
-        for c in comments_list:
-            if c.get("id") == payload.parent_comment_id:
-                reply_item = {
-                    "id": f"reply_{uuid.uuid4().hex[:8]}",
-                    "author_name": user_name,
-                    "author_handle": user_handle,
-                    "avatar_text": avatar_char,
-                    "time_ago": "Just now",
-                    "content": payload.content,
-                    "replying_to_handle": payload.replying_to_handle or c.get("author_handle"),
-                    "likes_count": 0,
-                    "is_liked": False,
-                }
-                replies = list(c.get("replies", []))
-                replies.append(reply_item)
-                c["replies"] = replies
-                c["is_replied"] = True
-                target_found = c
-                break
-
-        if not target_found:
-            raise HTTPException(status_code=404, detail="Parent comment not found")
-
-        meta["audience_comments"] = comments_list
-        meta["comments_count"] = meta.get("comments_count", 0) + 1
-        post.metadata_info = meta
-        await uow.commit()
-        return target_found
-
-    # Otherwise, add root comment
-    new_comment = {
-        "id": f"c_{uuid.uuid4().hex[:8]}",
-        "author_name": user_name,
-        "author_handle": user_handle,
-        "avatar_text": avatar_char,
-        "time_ago": "Just now",
-        "content": payload.content,
-        "likes_count": 0,
-        "is_liked": False,
-        "user_reply_text": None,
-        "is_replied": False,
-        "replies": [],
-    }
-    comments_list.insert(0, new_comment)
-    meta["audience_comments"] = comments_list
-    meta["comments_count"] = meta.get("comments_count", 0) + 1
-    post.metadata_info = meta
-
-    # Live dispatch to LinkedIn if post was published to LinkedIn
-    remote_post_id = meta.get("remote_post_id") or meta.get("published_url")
-    is_linkedin = (
-        meta.get("published_platform") == "linkedin"
-        or "linkedin" in (post.target_platforms or [])
-        or (remote_post_id and "urn:li:" in str(remote_post_id))
-    )
-    if is_linkedin and remote_post_id:
-        try:
-            li_acc = await uow.social_accounts.get_by_user_and_platform(current_user.id, "linkedin")
-            if li_acc and li_acc.access_token:
-                from backend.tools.publishers.linkedin import LinkedInPublisher
-                author_urn = (
-                    li_acc.platform_account_id
-                    if li_acc.platform_account_id.startswith("urn:li:")
-                    else f"urn:li:person:{li_acc.platform_account_id}"
-                )
-                li_pub = LinkedInPublisher()
-                parent_urn = (
-                    payload.parent_comment_id
-                    if (payload.parent_comment_id and "urn:li:" in payload.parent_comment_id)
-                    else None
-                )
-                await li_pub.create_comment(
-                    access_token=li_acc.access_token,
-                    author_urn=author_urn,
-                    post_urn=str(remote_post_id),
-                    text=payload.content,
-                    parent_comment_urn=parent_urn,
-                )
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("Failed to dispatch live comment to LinkedIn: %s", exc)
-
-    await uow.commit()
-    return new_comment
-
-
-@router.post("/{post_id}/comments/{comment_id}/like", response_model=CommentLikeResponse)
-async def toggle_like_comment(
-    post_id: str,
-    comment_id: str,
-    current_user: UserModel = Depends(get_current_user),
-    uow: IUnitOfWork = Depends(get_uow),
-):
-    """
-    Toggle like on a comment within a post.
-    """
-    try:
-        post_uuid = uuid.UUID(post_id)
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid post identifier")
-
-    post = await uow.posts.get_by_user_and_id(post_uuid, current_user.id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    meta = dict(post.metadata_info or {})
-    comments_list = list(meta.get("audience_comments", []))
-
-    liked = False
-    new_likes = 0
-    found = False
-
-    for c in comments_list:
-        if c.get("id") == comment_id:
-            liked = not c.get("is_liked", False)
-            c["is_liked"] = liked
-            c["likes_count"] = (c.get("likes_count", 0) + 1) if liked else max(0, c.get("likes_count", 0) - 1)
-            new_likes = c["likes_count"]
-            found = True
-            break
-        # Also check nested replies
-        for r in c.get("replies", []):
-            if r.get("id") == comment_id:
-                liked = not r.get("is_liked", False)
-                r["is_liked"] = liked
-                r["likes_count"] = (r.get("likes_count", 0) + 1) if liked else max(0, r.get("likes_count", 0) - 1)
-                new_likes = r["likes_count"]
-                found = True
-                break
-        if found:
-            break
-
-    if not found:
-        raise HTTPException(status_code=404, detail="Comment not found")
-
-    meta["audience_comments"] = comments_list
-    post.metadata_info = meta
-    await uow.commit()
-
-    return CommentLikeResponse(
-        comment_id=comment_id,
-        likes_count=new_likes,
-        is_liked=liked,
-    )

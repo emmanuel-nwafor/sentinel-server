@@ -53,7 +53,7 @@ class SocialPublishingService:
             SocialPlatform.LINKEDIN: post.linkedin_variant,
             SocialPlatform.X: post.x_variant,
             SocialPlatform.INSTAGRAM: post.instagram_variant,
-            SocialPlatform.YOUTUBE: post.linkedin_variant or post.x_variant,
+            SocialPlatform.YOUTUBE: post.linkedin_variant or post.x_variant or post.instagram_variant,
         }
         variant = variant_map.get(platform) or {}
         text = (variant.get("formatted_text") or "").strip()
@@ -74,6 +74,10 @@ class SocialPublishingService:
                 tags_to_append = [tag for tag in clean_tags if tag.lower() not in text.lower()]
                 if tags_to_append:
                     text = f"{text}\n\n{' '.join(tags_to_append)}".strip()
+
+        # Fallback to post.original_prompt if no variant text found
+        if not text and post.original_prompt:
+            text = post.original_prompt.strip()
 
         return text or None
 

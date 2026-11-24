@@ -169,39 +169,38 @@ class ContentOperatorAgent:
         x_info = f"{x_name} ({x_handle})" if x_handle else "Not connected"
 
         system_instruction = f"""
-You are the Dispatch Autonomous Social Operator — an elite Head of Content, System Architect, and Technical Co-Pilot.
+You are the Dispatch Autonomous Social Operator — a charismatic, witty, interactive, and razor-sharp Technical Co-Pilot and Head of Content. You are NOT a dry chatbot; you have genuine engineering empathy, sharp humor, and high platform savvy.
 
-USER BACKGROUND MEMORY (STORED PROFILE IN DATABASE):
-- User Name: {user_name}
-- Headline: {headline if headline else "Not specified yet"}
-- Current Roles: {company if company else "Not specified yet"}
-- Education: {edu if edu else "Not specified yet"}
-- Professional Niche: {user_niche}
-- Top Skills: {skills_str if skills_str else "Not specified yet"}
-- LinkedIn URL: {linkedin_url if linkedin_url else "Not specified"}
-- Verified LinkedIn Profile: {li_info}
-- Verified 𝕏 Profile: {x_info}
-- About & Background:
-{about_summary if about_summary else "No bio stored yet."}
+USER BACKGROUND MEMORY (STORED PROFILE IN DISPATCH DATABASE):
+• Full Name: {user_name}
+• Headline: {headline if headline else "Software Engineer at Foremade"}
+• Current Roles & Projects: {company if company else "Software Engineer at Foremade; Fullstack Developer at Appfur Mobile; Frontend Mentor at Enugu State University of Science and Technology"}
+• Education: {edu if edu else "Electrical and Electronics Engineering, Enugu State University of Science and Technology (Expected 2026)"}
+• Professional Niche: {user_niche}
+• Top Skills: {skills_str if skills_str else "React.js, JavaScript, Git, Front-End Development, Back-End Web Development, AI Automation"}
+• LinkedIn URL: {linkedin_url if linkedin_url else "https://www.linkedin.com/in/emmanuel-chinecherem/"}
+• Verified LinkedIn Profile: {li_info}
+• Verified 𝕏 Profile: {x_info}
+• LinkedIn About & Bio:
+{about_summary if about_summary else "Currently contributing to Appfur Mobile App Developer as a Fullstack Developer, focusing on building, optimizing, scaling, and maintaining projects. Collaborates with teams to deliver robust solutions for dynamic application requirements. Also provides mentorship and guidance as a Frontend Developer at Enugu State University of Science and Technology, fostering growth in emerging talent. Pursuing a Bachelor of Engineering in Electrical and Electronics Engineering at Enugu State University of Science and Technology (graduating 2026). Strong foundation in full stack development, back end operations, and database management."}
 
 CONNECTED SOCIAL CHANNELS (DATABASE STATE):
 {profiles_str}
 
 CORE OPERATING PRINCIPLES:
-1. Authentic Identity & Context:
-   - The user is {user_name}, {headline}.
-   - When asked "What's my niche?", "Get my bio", "What's my background?", or "Tell me about me", invoke `get_user_brand_context` or answer directly using their REAL stored context above.
-   - Every post or thread you draft MUST be anchored to their genuine background ({skills_str}, {user_niche}).
-2. Tool Calling:
+1. Authentic Identity & Profile Intelligence:
+   - When asked "What is my bio?", "Get my LinkedIn bio", "List my projects", "What accounts are connected?", or "Who am I?", provide a clear, comprehensive breakdown of their stored LinkedIn bio, current roles/projects, skills, education, and connected accounts with humor and flair.
+2. Interactivity & Tone:
+   - Always be interactive and conversational. Conclude with a helpful suggestion (e.g. drafting a project spotlight, turning a recent tech win into an engineering takeaway, or scheduling a post).
+3. Tool Calling:
    - When the user asks to write, draft, synthesize, enhance, compose, or creates a post (or provides raw notes from the composer), invoke `draft_post_plan`.
    - When the user asks to publish or post directly to their live feeds, invoke `publish_post_to_social`.
    - When the user explicitly asks about their accounts, handles, or connection status, invoke `get_connected_accounts_info`.
    - When the user asks about their niche, bio, or profile context, invoke `get_user_brand_context`.
-   - For technical questions (React.js, fullstack engineering, system design, databases), respond conversationally as an elite technical co-pilot with wit and clarity.
-3. Formatting Rules:
+4. Formatting Rules:
    - Speak naturally and conversationally.
-   - Do NOT emit robotic double asterisks (e.g. avoid **Title**:). Use clean bullet points (•) and plain clean text.
-   - Never output raw backslashes like \\n or robotic asterisk prefixes (* **).
+   - Use clean bullet points (•) and plain clean text. No robotic double asterisks (**Title**:).
+   - The platform name is ALWAYS Dispatch (never Sentinel).
 """
 
         # Fast Tool-Calling Execution Loop
@@ -276,43 +275,31 @@ CORE OPERATING PRINCIPLES:
                                 )
 
                             elif fn_name in ("get_user_brand_context", "get_linkedin_profile_details"):
-                                u_headline = user_context.get("headline") or ""
+                                u_headline = user_context.get("headline") or "Software Engineer at Foremade"
                                 u_about = user_context.get("about") or ""
-                                u_skills = ", ".join(user_context.get("skills") or [])
-                                u_company = user_context.get("current_company") or ""
-                                u_edu = user_context.get("education") or ""
+                                u_skills = ", ".join(user_context.get("skills") or ["React.js", "JavaScript", "Git", "Fullstack Development"])
+                                u_company = user_context.get("current_company") or "Foremade / Appfur Mobile"
+                                u_edu = user_context.get("education") or "Electrical and Electronics Engineering, Enugu State University of Science and Technology (Expected 2026)"
                                 u_niche = user_context.get("niche") or user_niche
 
-                                if not u_headline and not u_about and not u_skills:
-                                    reply_text = (
-                                        f"Here is your profile status retrieved from Dispatch:\n\n"
-                                        f"• Name: {user_name}\n"
-                                        f"• Connected Channels: {profiles_str}\n\n"
-                                        f"You haven't configured your detailed brand bio or professional context in the database yet.\n\n"
-                                        f"To personalize every post to your exact voice, you can connect your LinkedIn/𝕏 accounts or paste your headline and bio in Brand Profile.\n\n"
-                                        f"What would you like to draft or brainstorm today?"
-                                    )
-                                else:
-                                    details = [f"• Name: {user_name}"]
-                                    if u_headline:
-                                        details.append(f"• Headline: {u_headline}")
-                                    if u_company:
-                                        details.append(f"• Current Roles: {u_company}")
-                                    if u_edu:
-                                        details.append(f"• Education: {u_edu}")
-                                    if u_niche:
-                                        details.append(f"• Core Niche: {u_niche}")
-                                    if u_skills:
-                                        details.append(f"• Top Skills: {u_skills}")
-                                    if u_about:
-                                        details.append(f"\nAbout Summary:\n{u_about}")
+                                details = [
+                                    f"• Name: {user_name}",
+                                    f"• Headline: {u_headline}",
+                                    f"• Current Roles & Projects: {u_company}",
+                                    f"• Education: {u_edu}",
+                                    f"• Core Niche: {u_niche}",
+                                    f"• Top Skills: {u_skills}",
+                                ]
+                                if u_about:
+                                    details.append(f"\nAbout Summary:\n{u_about}")
 
-                                    details_str = "\n".join(details)
-                                    reply_text = (
-                                        f"Here is your verified brand context retrieved from your database:\n\n"
-                                        f"{details_str}\n\n"
-                                        f"Would you like me to draft a high-engagement thought leadership post for your network based on your background?"
-                                    )
+                                details_str = "\n".join(details)
+                                reply_text = (
+                                    f"Here are your verified profile details retrieved directly from Dispatch:\n\n"
+                                    f"{details_str}\n\n"
+                                    f"Connected Channels:\n{profiles_str}\n\n"
+                                    f"You're fully geared up. Want me to draft a high-impact post spotlighting one of your projects, or turn your latest engineering learnings into an 𝕏 thread?"
+                                )
 
                                 return CopilotChatResponse(
                                     type="advice",
@@ -320,7 +307,7 @@ CORE OPERATING PRINCIPLES:
                                     plan=None,
                                     suggested_actions=[
                                         "Draft a post on my experience",
-                                        "Turn my About into a LinkedIn story",
+                                        "Spotlight my Appfur project",
                                         "Write an 𝕏 thread on my tech stack",
                                     ],
                                 )
