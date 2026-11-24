@@ -192,6 +192,8 @@ def _render_oauth_callback_html(
         if "linkedin" in platform_name.lower()
         else "#111418"
         if "x" in platform_name.lower()
+        else "#FF0000"
+        if "youtube" in platform_name.lower()
         else "#E1306C"
     )
     is_ok = status == "success"
@@ -341,6 +343,8 @@ async def browser_oauth_callback(
         target_redirect = settings.X_REDIRECT_URI
     elif resolved_platform == SocialPlatform.INSTAGRAM:
         target_redirect = settings.META_REDIRECT_URI
+    elif resolved_platform == SocialPlatform.YOUTUBE:
+        target_redirect = settings.YOUTUBE_REDIRECT_URI
 
     try:
         account = await _persist_oauth_bundle(
