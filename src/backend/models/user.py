@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from backend.models.customer import CustomerModel
     from backend.models.conversation import ConversationModel
     from backend.models.brand_voice import BrandVoiceModel
+    from backend.models.brand_profile import UserBrandProfileModel
 
 
 class UserModel(Base):
@@ -74,6 +75,15 @@ class UserModel(Base):
     brand_voices: Mapped[List["BrandVoiceModel"]] = relationship(
         "BrandVoiceModel",
         back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    # Relationship to User Brand Profile Memory Layer
+    brand_profile: Mapped[Optional["UserBrandProfileModel"]] = relationship(
+        "UserBrandProfileModel",
+        back_populates="user",
+        uselist=False,
         cascade="all, delete-orphan",
         lazy="selectin",
     )

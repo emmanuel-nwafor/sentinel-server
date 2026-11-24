@@ -8,6 +8,7 @@ from backend.models.customer import CustomerModel
 from backend.models.conversation import ConversationModel
 from backend.models.message import MessageModel
 from backend.models.brand_voice import BrandVoiceModel
+from backend.models.brand_profile import UserBrandProfileModel
 
 __all__ = [
     "Base",
@@ -22,4 +23,5 @@ __all__ = [
     "ConversationModel",
     "MessageModel",
     "BrandVoiceModel",
+    "UserBrandProfileModel",
 ]

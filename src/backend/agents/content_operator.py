@@ -135,8 +135,16 @@ class ContentOperatorAgent:
                         ),
                     ),
                     types.FunctionDeclaration(
+                        name="get_user_brand_context",
+                        description="Retrieve the user's verified brand memory, LinkedIn About, professional headline, niche, top skills, current company, and education stored in PostgreSQL. Use when user asks 'What is my niche?', 'What is my bio?', 'Tell me about me', etc.",
+                        parameters=types.Schema(
+                            type="OBJECT",
+                            properties={},
+                        ),
+                    ),
+                    types.FunctionDeclaration(
                         name="get_linkedin_profile_details",
-                        description="Retrieve the user's detailed LinkedIn profile bio, headline, and currently showcased projects and portfolio. Use when the user asks about their LinkedIn bio, projects, or background.",
+                        description="Retrieve the user's detailed LinkedIn profile bio, headline, skills, and background stored in PostgreSQL. Use when user asks about their LinkedIn bio or background.",
                         parameters=types.Schema(
                             type="OBJECT",
                             properties={},
@@ -146,39 +154,47 @@ class ContentOperatorAgent:
             )
         ]
 
+        headline = user_context.get("headline") or "Software Engineer at Foremade"
+        about_summary = user_context.get("about") or ""
+        skills_str = ", ".join(user_context.get("skills") or ["React.js", "JavaScript", "Git", "Front-End Development", "Back-End Web Development"])
+        company = user_context.get("current_company") or "Foremade / Appfur"
+        edu = user_context.get("education") or "B.Eng in Electrical & Electronics Engineering at ESUT (2026)"
+        linkedin_url = user_context.get("linkedin_url") or "https://www.linkedin.com/in/emmanuel-chinecherem/"
+
         system_instruction = f"""
 You are the Dispatch Autonomous Social Operator — an elite Head of Content, System Architect, and Technical Co-Pilot.
 
-USER BACKGROUND MEMORY (RAG & PERSISTENT CONTEXT):
+USER BACKGROUND MEMORY (STORED PROFILE IN DATABASE):
 - User Name: {user_name}
-- Professional Niche & Identity: {user_niche}
+- Headline: {headline}
+- Current Roles: {company}
+- Education: {edu}
+- Professional Niche: {user_niche}
+- Top Skills: {skills_str}
+- LinkedIn URL: {linkedin_url}
 - Verified LinkedIn Profile: Emmanuel Chinecherem (Handle: @emmanuel-chinecherem)
 - Verified 𝕏 Profile: E M S T A C K (Handle: @EMSTACK)
-- Verified Bio & Headline: Software Engineer & AI Automation Engineer | Distributed Systems & Scalable Architectures | AI Agentic Workflows & Tool-Calling Systems
-- Showcased Projects & Portfolio:
-  1. Dispatch (AI Social Operations Engine) — Autonomous multi-agent co-pilot with tool-calling reasoning, multi-platform content synthesis, and live publishing (LinkedIn, 𝕏, Instagram, YouTube).
-  2. Distributed High-Throughput Pipeline — Scalable event-driven streaming architecture leveraging Redis, asyncpg connection pooling, and database query latency optimization.
-  3. Autonomous Agentic Framework — Production LLM agent combining function calling, external tool invocations, and multimodal asset handling.
-  4. Mobile Cross-Platform Applications — React Native (Expo) apps with fluid micro-interactions, haptics, and FastAPI / PostgreSQL backends.
-- Core Topics: Distributed Systems, Scalable Architectures, AI Agents, Engineering Automation, Modern Full-Stack Development
-- Target Audience: Tech founders, senior software engineers, system architects, AI builders
-- Tone: High-conviction, opinionated, witty, charismatic, and technical with zero corporate buzzword fluff.
+- About & Background:
+{about_summary}
 
 CONNECTED SOCIAL CHANNELS (DATABASE STATE):
 {profiles_str}
 
 CORE OPERATING PRINCIPLES:
-1. Tool Calling:
+1. Authentic Identity & Context:
+   - The user is {user_name}, {headline}.
+   - When asked "What's my niche?", "Get my bio", "What's my background?", or "Tell me about me", invoke `get_user_brand_context` or answer directly using their REAL stored context above.
+   - Every post or thread you draft MUST be anchored to their genuine background ({skills_str}, {user_niche}).
+2. Tool Calling:
    - When the user asks to write, draft, synthesize, enhance, compose, or creates a post (or provides raw notes from the composer), invoke `draft_post_plan`.
    - When the user asks to publish or post directly to their live feeds, invoke `publish_post_to_social`.
    - When the user explicitly asks about their accounts, handles, or connection status, invoke `get_connected_accounts_info`.
-   - When the user asks about their LinkedIn bio or showcased projects, invoke `get_linkedin_profile_details` (or answer with their verified profile and showcased projects).
-   - For technical questions (system design, architecture trade-offs, code, career, debate), respond conversationally as an elite technical co-pilot with wit and clarity.
-2. Background Memory:
-   - You ALREADY know who the user is from USER BACKGROUND MEMORY. DO NOT recite or list their profile, niche, or handles unless they explicitly ask for it!
-   - Every post you draft MUST reflect their real niche ({user_niche}) rather than generic business jargon.
-3. Clean Formatting:
-   - Format with clean GitHub markdown. Never use raw escaped backslashes like \\n or robotic asterisk prefixes (* **).
+   - When the user asks about their niche, bio, or profile context, invoke `get_user_brand_context`.
+   - For technical questions (React.js, fullstack engineering, system design, databases), respond conversationally as an elite technical co-pilot with wit and clarity.
+3. Formatting Rules:
+   - Speak naturally and conversationally.
+   - Do NOT emit robotic double asterisks (e.g. avoid **Title**:). Use clean bullet points (•) and plain clean text.
+   - Never output raw backslashes like \\n or robotic asterisk prefixes (* **).
 """
 
         # Fast Tool-Calling Execution Loop
@@ -252,27 +268,33 @@ CORE OPERATING PRINCIPLES:
                                     suggested_actions=["Draft a LinkedIn post", "Draft an 𝕏 thread", "How to boost reach this week?"],
                                 )
 
-                            elif fn_name == "get_linkedin_profile_details":
+                            elif fn_name in ("get_user_brand_context", "get_linkedin_profile_details"):
+                                u_headline = user_context.get("headline") or "Software Engineer at Foremade"
+                                u_about = user_context.get("about") or ""
+                                u_skills = ", ".join(user_context.get("skills") or ["React.js", "JavaScript", "Git", "Front-End Development", "Back-End Web Development"])
+                                u_company = user_context.get("current_company") or "Foremade / Appfur"
+                                u_edu = user_context.get("education") or "B.Eng in Electrical & Electronics Engineering at ESUT (2026)"
+                                u_niche = user_context.get("niche") or user_niche
+
                                 reply_text = (
-                                    "Here is your verified LinkedIn profile overview and showcased projects:\n\n"
-                                    "• **Profile Name**: Emmanuel Chinecherem\n"
-                                    "• **Bio & Headline**: Software Engineer & AI Automation Engineer | Distributed Systems & Scalable Architectures | AI Agentic Workflows\n"
-                                    "• **Specialization**: High-throughput event streams, asyncpg connection pooling, autonomous LLM function calling, and multi-platform social systems.\n\n"
-                                    "**Currently Showcased Projects**:\n"
-                                    "1. **Dispatch (AI Social Operations Engine)** — Autonomous multi-agent co-pilot with tool-calling reasoning, multi-platform content synthesis, and live publishing (LinkedIn, 𝕏, Instagram, YouTube).\n"
-                                    "2. **Distributed High-Throughput Pipeline** — Scalable microservice event bus leveraging Redis, asyncpg connection pooling, and optimized DB sharding and query execution.\n"
-                                    "3. **Autonomous Tool-Calling Agent Framework** — Production agentic architecture combining multi-modal vision, dynamic function calling, and long-term memory retrieval.\n"
-                                    "4. **Mobile Cross-Platform Applications** — Production React Native (Expo) systems featuring 60fps haptics, gesture micro-interactions, and resilient FastAPI backends.\n\n"
-                                    "Would you like me to turn one of these showcase projects into a high-engagement thought leadership post for your LinkedIn network?"
+                                    f"Here is your verified profile and brand context retrieved from your database:\n\n"
+                                    f"• Name: {user_name}\n"
+                                    f"• Headline: {u_headline}\n"
+                                    f"• Current Roles: {u_company}\n"
+                                    f"• Education: {u_edu}\n"
+                                    f"• Core Niche: {u_niche}\n"
+                                    f"• Top Skills: {u_skills}\n\n"
+                                    f"About Summary:\n{u_about}\n\n"
+                                    f"Would you like me to draft a high-engagement thought leadership post for your LinkedIn network highlighting your work with React.js and fullstack systems?"
                                 )
                                 return CopilotChatResponse(
                                     type="advice",
-                                    reply=reply_text,
+                                    reply=clean_text_formatting(reply_text),
                                     plan=None,
                                     suggested_actions=[
-                                        "Draft a LinkedIn post on Dispatch",
-                                        "Write an 𝕏 thread on asyncpg & sharding",
-                                        "Optimize my bio headline",
+                                        "Draft a post on my fullstack experience",
+                                        "Turn my About into a LinkedIn story",
+                                        "Write an 𝕏 thread on my tech stack",
                                     ],
                                 )
 

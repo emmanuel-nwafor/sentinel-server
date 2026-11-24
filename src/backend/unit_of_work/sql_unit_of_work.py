@@ -19,6 +19,7 @@ from backend.repositories.conversation_repository import (
 )
 from backend.repositories.message_repository import MessageRepository, IMessageRepository
 from backend.repositories.brand_voice_repository import BrandVoiceRepository, IBrandVoiceRepository
+from backend.repositories.brand_profile_repository import BrandProfileRepository, IBrandProfileRepository
 
 
 class SqlAlchemyUnitOfWork(IUnitOfWork):
@@ -40,6 +41,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.conversations: IConversationRepository = ConversationRepository(self._session)
         self.messages: IMessageRepository = MessageRepository(self._session)
         self.brand_voices: IBrandVoiceRepository = BrandVoiceRepository(self._session)
+        self.brand_profiles: IBrandProfileRepository = BrandProfileRepository(self._session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:

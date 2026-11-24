@@ -9,6 +9,7 @@ from backend.repositories.customer_repository import ICustomerRepository
 from backend.repositories.conversation_repository import IConversationRepository
 from backend.repositories.message_repository import IMessageRepository
 from backend.repositories.brand_voice_repository import IBrandVoiceRepository
+from backend.repositories.brand_profile_repository import IBrandProfileRepository
 
 
 class IUnitOfWork(ABC):
@@ -26,6 +27,7 @@ class IUnitOfWork(ABC):
     conversations: IConversationRepository
     messages: IMessageRepository
     brand_voices: IBrandVoiceRepository
+    brand_profiles: IBrandProfileRepository
 
     @abstractmethod
     async def __aenter__(self) -> Self:

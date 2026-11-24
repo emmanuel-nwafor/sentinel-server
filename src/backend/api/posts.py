@@ -126,12 +126,45 @@ async def copilot_chat(
     linkedin_acc = next((sa for sa in profiles_info if sa["platform"] == "linkedin"), None)
     x_acc = next((sa for sa in profiles_info if sa["platform"] == "x"), None)
 
+    # Fetch stored Brand Profile from PostgreSQL
+    brand_profile = None
+    try:
+        brand_profile = await uow.brand_profiles.get_by_user(current_user.id)
+        if not brand_profile:
+            from backend.api.profile import DEFAULT_EMMANUEL_PROFILE
+            brand_profile = await uow.brand_profiles.upsert_profile(
+                user_id=current_user.id,
+                full_name=current_user.name or DEFAULT_EMMANUEL_PROFILE["full_name"],
+                headline=DEFAULT_EMMANUEL_PROFILE["headline"],
+                about=DEFAULT_EMMANUEL_PROFILE["about"],
+                niche=DEFAULT_EMMANUEL_PROFILE["niche"],
+                target_audience=DEFAULT_EMMANUEL_PROFILE["target_audience"],
+                tone=DEFAULT_EMMANUEL_PROFILE["tone"],
+                core_topics=DEFAULT_EMMANUEL_PROFILE["core_topics"],
+                skills=DEFAULT_EMMANUEL_PROFILE["skills"],
+                current_company=DEFAULT_EMMANUEL_PROFILE["current_company"],
+                education=DEFAULT_EMMANUEL_PROFILE["education"],
+                linkedin_url=DEFAULT_EMMANUEL_PROFILE["linkedin_url"],
+                source_type=DEFAULT_EMMANUEL_PROFILE["source_type"],
+            )
+            await uow.commit()
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Failed to resolve brand profile: %s", exc)
+
     user_context = {
-        "name": current_user.name or "Emmanuel Onyekachi",
+        "name": brand_profile.full_name if brand_profile else (current_user.name or "Emmanuel Chinecherem"),
         "email": current_user.email,
-        "niche": "Software Engineer, AI Engineer, AI Automation & Scalable Architecture",
+        "headline": brand_profile.headline if brand_profile else "Software Engineer at Foremade",
+        "about": brand_profile.about if brand_profile else "",
+        "niche": brand_profile.niche if brand_profile else "Fullstack & Mobile Engineering, Scalable Cloud Architectures",
+        "skills": brand_profile.skills if brand_profile else ["React.js", "JavaScript", "Git", "Front-End Development", "Back-End Web Development"],
+        "core_topics": brand_profile.core_topics if brand_profile else [],
+        "current_company": brand_profile.current_company if brand_profile else "Foremade / Appfur",
+        "education": brand_profile.education if brand_profile else "B.Eng in Electrical & Electronics Engineering at ESUT (2026)",
         "linkedin_name": linkedin_acc["account_name"] if linkedin_acc else "Emmanuel Chinecherem",
         "linkedin_handle": linkedin_acc["account_handle"] if linkedin_acc else "@emmanuel-chinecherem",
+        "linkedin_url": brand_profile.linkedin_url if brand_profile else "https://www.linkedin.com/in/emmanuel-chinecherem/",
         "x_name": x_acc["account_name"] if x_acc else "E M S T A C K",
         "x_handle": x_acc["account_handle"] if x_acc else "@EMSTACK",
     }
