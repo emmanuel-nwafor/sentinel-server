@@ -130,43 +130,9 @@ async def copilot_chat(
     brand_profile = None
     try:
         brand_profile = await uow.brand_profiles.get_by_user(current_user.id)
-        if not brand_profile:
-            # Auto-seed profile with verified user identity
-            user_display = (
-                current_user.name
-                or (linkedin_acc["account_name"] if linkedin_acc else None)
-                or "Emmanuel Chinecherem"
-            )
-            brand_profile = await uow.brand_profiles.upsert_profile(
-                user_id=current_user.id,
-                full_name=user_display,
-                headline="Software Engineer at Foremade",
-                about=(
-                    "Currently contributing to Appfur Mobile App Developer as a Fullstack Developer, "
-                    "focusing on building, optimizing, scaling, and maintaining projects. Collaborates with "
-                    "teams to deliver robust solutions for dynamic application requirements. Also provides mentorship "
-                    "and guidance as a Frontend Developer at Enugu State University of Science and Technology, "
-                    "fostering growth in emerging talent.\n\n"
-                    "Pursuing a Bachelor of Engineering in Electrical and Electronics Engineering at Enugu State "
-                    "University of Science and Technology, expected to graduate in 2026. With a strong foundation "
-                    "in full stack development, back end operations, and database management, dedicated to creating "
-                    "scalable, user-focused applications that merge functionality with design."
-                ),
-                niche="Fullstack Engineering & AI Automation",
-                target_audience="Founders, engineers, and tech innovators",
-                tone="Authoritative, interactive, and witty technical co-pilot",
-                core_topics=["React Native", "Distributed Systems", "Database Optimization", "Fullstack Development"],
-                skills=["React.js", "JavaScript", "Git", "Front-End Development", "Back-End Web Development", "AI Automation"],
-                current_company="Foremade / Appfur Mobile",
-                education="Electrical and Electronics Engineering, Enugu State University of Science and Technology (Expected 2026)",
-                linkedin_url="https://www.linkedin.com/in/emmanuel-chinecherem/",
-                raw_input="LinkedIn Profile Sync",
-                source_type="linkedin_sync",
-            )
-            await uow.commit()
     except Exception as exc:
         import logging
-        logging.getLogger(__name__).warning("Failed to resolve or seed brand profile: %s", exc)
+        logging.getLogger(__name__).warning("Failed to resolve brand profile: %s", exc)
 
     user_context = {
         "name": (brand_profile.full_name if brand_profile else None)

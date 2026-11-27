@@ -101,12 +101,20 @@ class VoicePostGenerationResponse(BaseModel):
     status: PostStatus
 
 
+class ChatHistoryMessage(BaseModel):
+    role: str = Field(description="Message role: 'user' or 'model'")
+    text: str = Field(description="Message text content")
+
+
 class CopilotChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="User query or command for Dispatch Copilot")
     workspace: WorkspaceType = Field(default=WorkspaceType.CONTENT)
     connected_platforms: List[str] = Field(default_factory=list)
     brand_voice_id: Optional[str] = None
     media_url: Optional[str] = Field(None, description="Optional public URL of image/media to analyze")
+    conversation_history: List[ChatHistoryMessage] = Field(
+        default_factory=list, description="Recent conversation turns for contextual multi-turn reasoning"
+    )
 
 
 class CopilotChatResponse(BaseModel):
