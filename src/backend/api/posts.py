@@ -8,6 +8,7 @@ from backend.models.post import PostModel
 from backend.models.social_account import SocialPlatform
 from backend.unit_of_work.base import IUnitOfWork
 from backend.api.deps import get_uow, get_current_user
+from backend.core.security import token_cipher
 from backend.schemas.content import (
     ContentGenerationRequest,
     ContentGenerationResponse,
@@ -578,7 +579,7 @@ async def create_manual_post(
         await uow.posts.create(new_post)
         await uow.commit()
 
-    return serialize_post_model(new_post)
+    return serialize_post_model(new_post, current_user.id)
 
 
 @router.get("", response_model=List[PostDetailResponse])
@@ -593,7 +594,7 @@ async def list_user_posts(
         workspace=workspace.value if workspace else None,
         status=post_status.value if post_status else None,
     )
-    return [serialize_post_model(p) for p in posts]
+    return [serialize_post_model(p, current_user.id) for p in posts]
 
 
 @router.get("/{post_id}", response_model=PostDetailResponse)
@@ -611,7 +612,7 @@ async def get_post_by_id(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    return serialize_post_model(post)
+    return serialize_post_model(post, current_user.id)
 
 
 @router.put("/{post_id}", response_model=PostDetailResponse)
@@ -787,10 +788,11 @@ async def list_post_comments(
     if is_linkedin and remote_post_id:
         try:
             li_acc = await uow.social_accounts.get_by_user_and_platform(current_user.id, "linkedin")
-            if li_acc and li_acc.access_token:
+            if li_acc and li_acc.encrypted_access_token:
+                access_token = token_cipher.decrypt(li_acc.encrypted_access_token)
                 from backend.tools.publishers.linkedin import LinkedInPublisher
                 li_pub = LinkedInPublisher()
-                live_comments = await li_pub.fetch_comments(li_acc.access_token, str(remote_post_id))
+                live_comments = await li_pub.fetch_comments(access_token, str(remote_post_id))
                 if live_comments:
                     existing_ids = {c.get("id") for c in comments_data}
                     for lc in live_comments:
@@ -800,7 +802,7 @@ async def list_post_comments(
                     meta["comments_count"] = len(comments_data)
 
                 # Sync reactions / likes
-                actions = await li_pub.fetch_social_actions(li_acc.access_token, str(remote_post_id))
+                actions = await li_pub.fetch_social_actions(access_token, str(remote_post_id))
                 if actions and "total_likes" in actions:
                     meta["likes_count"] = max(meta.get("likes_count", 0), actions["total_likes"])
                     if actions.get("is_liked"):
@@ -812,7 +814,44 @@ async def list_post_comments(
             import logging
             logging.getLogger(__name__).warning("Failed to sync live LinkedIn comments: %s", exc)
 
-    return comments_data
+    # Normalize comments to ensure strict schema adherence
+    normalized_comments: List[AudienceCommentItem] = []
+    for c in comments_data:
+        if isinstance(c, dict):
+            raw_replies = c.get("replies") or []
+            norm_replies: List[AudienceCommentReply] = []
+            for r in raw_replies:
+                if isinstance(r, dict):
+                    norm_replies.append(
+                        AudienceCommentReply(
+                            id=str(r.get("id") or f"rep_{uuid.uuid4().hex[:8]}"),
+                            author_name=str(r.get("author_name") or "Responder"),
+                            author_handle=str(r.get("author_handle") or "@user"),
+                            avatar_text=str(r.get("avatar_text") or (r.get("author_name") or "U")[0].upper()),
+                            time_ago=str(r.get("time_ago") or "Recently"),
+                            content=str(r.get("content") or ""),
+                            replying_to_handle=r.get("replying_to_handle"),
+                            likes_count=int(r.get("likes_count") or 0),
+                            is_liked=bool(r.get("is_liked", False)),
+                        )
+                    )
+            normalized_comments.append(
+                AudienceCommentItem(
+                    id=str(c.get("id") or f"c_{uuid.uuid4().hex[:8]}"),
+                    author_name=str(c.get("author_name") or "Audience Member"),
+                    author_handle=str(c.get("author_handle") or "@user"),
+                    avatar_text=str(c.get("avatar_text") or (c.get("author_name") or "A")[0].upper()),
+                    time_ago=str(c.get("time_ago") or "Recently"),
+                    content=str(c.get("content") or ""),
+                    likes_count=int(c.get("likes_count") or 0),
+                    is_liked=bool(c.get("is_liked", False)),
+                    user_reply_text=c.get("user_reply_text"),
+                    is_replied=bool(c.get("is_replied", False)),
+                    replies=norm_replies,
+                )
+            )
+
+    return normalized_comments
 
 
 @router.post("/{post_id}/comments", response_model=AudienceCommentItem, status_code=status.HTTP_201_CREATED)
@@ -902,7 +941,8 @@ async def add_post_comment(
     if is_linkedin and remote_post_id:
         try:
             li_acc = await uow.social_accounts.get_by_user_and_platform(current_user.id, "linkedin")
-            if li_acc and li_acc.access_token:
+            if li_acc and li_acc.encrypted_access_token:
+                access_token = token_cipher.decrypt(li_acc.encrypted_access_token)
                 from backend.tools.publishers.linkedin import LinkedInPublisher
                 author_urn = (
                     li_acc.platform_account_id
@@ -916,7 +956,7 @@ async def add_post_comment(
                     else None
                 )
                 await li_pub.create_comment(
-                    access_token=li_acc.access_token,
+                    access_token=access_token,
                     author_urn=author_urn,
                     post_urn=str(remote_post_id),
                     text=payload.content,

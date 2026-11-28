@@ -26,12 +26,18 @@ def clean_text_formatting(text: str) -> str:
         return ""
     # Unescape literal backslashes like \n or \r\n
     cleaned = text.replace("\\r\\n", "\n").replace("\\n", "\n")
+    # Clean markdown headers: convert "### Header" to clean section titles (strip hashtags)
+    cleaned = re.sub(r"^\s*#{1,6}\s*(.+?)$", r"\1", cleaned, flags=re.MULTILINE)
+    # Remove markdown horizontal dividers (---, ***, ___)
+    cleaned = re.sub(r"^\s*[-*_]{3,}\s*$", r"", cleaned, flags=re.MULTILINE)
     # Replace markdown bullet asterisks e.g. "* **Title:**" or "* Bullet" with Unicode bullet "• "
     cleaned = re.sub(r"^\s*[*•-]\s+\*\*(.*?)\*\*:\s*", r"• \1: ", cleaned, flags=re.MULTILINE)
     cleaned = re.sub(r"^\s*[*•-]\s+", r"• ", cleaned, flags=re.MULTILINE)
     # Strip remaining bold/italic asterisks that clutter native mobile text
     cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
     cleaned = re.sub(r"\*(.*?)\*", r"\1", cleaned)
+    # Collapse 3+ consecutive newlines into 2
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
 
 
@@ -306,9 +312,11 @@ CORE OPERATIONAL BEHAVIORS:
    - ONLY call `draft_post_plan` when the user explicitly asks to draft, write, compose, or create posts.
 3. Multi-Turn Conversation Memory:
    - Always remember previous turns in the conversation. When the user says "I said go through it first" or refers to something mentioned earlier, maintain complete continuity.
-4. Voice & Style:
+4. Voice & Formatting Style:
    - Clean, charismatic, concise, and professional.
-   - Use clean Unicode bullet points (•) and clear headings. Avoid excessive bold asterisks.
+   - STRICT FORMATTING: NEVER output markdown heading hashes (like #, ##, ###) or horizontal rule dividers (---, ***).
+   - NEVER output bold/italic asterisks (**) in your replies. Write section headers as clean capitalized titles on their own line (e.g. "Hero Identity & Value Proposition" or "Core Tech Stack:").
+   - Always format lists with clean Unicode bullet points (•).
    - The platform name is ALWAYS Dispatch.
 
 CREATOR IDENTITY (MEMORY):
