@@ -72,7 +72,7 @@ async def scrape_webpage_content(raw_url: str) -> Dict[str, Any]:
             }
             fc_payload = {
                 "url": url,
-                "formats": ["markdown"],
+                "formats": ["markdown", "screenshot"],
             }
             async with httpx.AsyncClient(timeout=20.0) as client:
                 fc_resp = await client.post(
@@ -88,12 +88,19 @@ async def scrape_webpage_content(raw_url: str) -> Dict[str, Any]:
                         metadata = d.get("metadata", {}) or {}
                         title = metadata.get("title") or metadata.get("og:title") or ""
                         desc = metadata.get("description") or metadata.get("og:description") or ""
+                        preview_img = (
+                            d.get("screenshot")
+                            or metadata.get("og:image")
+                            or metadata.get("image")
+                            or f"https://s0.wp.com/mshots/v1/{url}?w=900"
+                        )
                         return {
                             "status": "success",
                             "engine": "firecrawl",
                             "target_url": url,
                             "page_title": title,
                             "meta_description": desc,
+                            "preview_image_url": preview_img,
                             "extracted_content": md_text,
                         }
         except Exception as fc_err:
@@ -111,6 +118,13 @@ async def scrape_webpage_content(raw_url: str) -> Dict[str, Any]:
         async with httpx.AsyncClient(follow_redirects=True, timeout=14.0) as client:
             resp = await client.get(url, headers=headers)
             soup = BeautifulSoup(resp.text, "html.parser")
+
+            og_img_tag = soup.find("meta", attrs={"property": "og:image"}) or soup.find(
+                "meta", attrs={"name": "twitter:image"}
+            )
+            og_img = og_img_tag["content"].strip() if og_img_tag and og_img_tag.get("content") else ""
+            preview_img = og_img if og_img else f"https://s0.wp.com/mshots/v1/{url}?w=900"
+
             for tag in soup(["script", "style", "noscript", "svg", "iframe", "footer", "form"]):
                 tag.decompose()
 
@@ -132,6 +146,7 @@ async def scrape_webpage_content(raw_url: str) -> Dict[str, Any]:
                 "http_status": resp.status_code,
                 "page_title": title,
                 "meta_description": meta_desc,
+                "preview_image_url": preview_img,
                 "key_headings": headings,
                 "extracted_content": body_text,
             }
@@ -386,6 +401,7 @@ CONNECTED ACCOUNTS:
         ]
 
         last_error = None
+        last_browsed_site: Dict[str, Any] = {}
         for model_name in models_to_try:
             try:
                 # ReAct Tool Execution Loop (up to 4 autonomous iterations)
@@ -432,6 +448,9 @@ CONNECTED ACCOUNTS:
                             reply=reply_text,
                             plan=None,
                             suggested_actions=actions,
+                            preview_image_url=last_browsed_site.get("preview_image_url"),
+                            preview_url=last_browsed_site.get("preview_url"),
+                            preview_title=last_browsed_site.get("preview_title"),
                         )
 
                     # Execute function calls
@@ -443,6 +462,12 @@ CONNECTED ACCOUNTS:
                         if fn_name == "browse_website":
                             url_to_browse = fn_args.get("url") or user_msg
                             tool_result = await scrape_webpage_content(url_to_browse)
+                            if tool_result.get("preview_image_url"):
+                                last_browsed_site = {
+                                    "preview_image_url": tool_result.get("preview_image_url"),
+                                    "preview_url": tool_result.get("target_url") or url_to_browse,
+                                    "preview_title": tool_result.get("page_title"),
+                                }
                             resp_part = types.Part.from_function_response(
                                 name=fn_name,
                                 response={"result": tool_result},
@@ -581,6 +606,7 @@ CONNECTED ACCOUNTS:
             "gemini-pro-latest",
         ]
         last_error = None
+        last_browsed_site: Dict[str, Any] = {}
         for model_name in models_to_try:
             try:
                 response = self.client.models.generate_content(

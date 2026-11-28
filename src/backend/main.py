@@ -86,6 +86,22 @@ app.include_router(profile_router, prefix="/api/v1")
 
 # Mount Static Assets for Direct Media Uploads & Stream Serving
 Path("static/uploads").mkdir(parents=True, exist_ok=True)
+
+
+@app.get("/static/uploads/{filename}")
+async def serve_static_upload(filename: str):
+    file_path = Path("static/uploads") / filename
+    if file_path.exists():
+        from fastapi.responses import FileResponse
+        return FileResponse(file_path)
+    from fastapi.responses import Response
+    return Response(
+        content=b"",
+        status_code=404,
+        headers={"Cache-Control": "public, max-age=86400, immutable"},
+    )
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 

@@ -125,4 +125,7 @@ class CopilotChatResponse(BaseModel):
     auto_dispatched: bool = Field(default=False, description="Whether the post was autonomously published live")
     published_url: Optional[str] = Field(None, description="Direct remote URL of the published post")
     published_platform: Optional[str] = Field(None, description="Platform that was autonomously published to")
+    preview_image_url: Optional[str] = Field(None, description="Visual screenshot or banner of scraped website for live validation")
+    preview_url: Optional[str] = Field(None, description="Direct target URL of scraped website")
+    preview_title: Optional[str] = Field(None, description="Page title of scraped website")
 
