@@ -144,6 +144,37 @@ class YouTubePublisher(BaseSocialPublisher):
                 scopes=self.DEFAULT_SCOPES,
             )
 
+    async def refresh_access_token(self, refresh_token: str) -> OAuthTokenBundle:
+        """Exchange refresh token for a fresh Google / YouTube access token."""
+        if not self.is_oauth_configured():
+            raise SocialPublishError("YouTube OAuth client credentials are not configured.")
+
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            token_resp = await client.post(
+                self.OAUTH_TOKEN_URL,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": settings.YOUTUBE_CLIENT_ID,
+                    "client_secret": settings.YOUTUBE_CLIENT_SECRET,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            if token_resp.status_code >= 400:
+                raise SocialPublishError(
+                    f"YouTube token refresh failed ({token_resp.status_code}): {token_resp.text}"
+                )
+
+            token_data = token_resp.json()
+            return OAuthTokenBundle(
+                access_token=token_data["access_token"],
+                refresh_token=token_data.get("refresh_token") or refresh_token,
+                expires_in=token_data.get("expires_in"),
+                platform_account_id="",
+                account_name="",
+                scopes=self.DEFAULT_SCOPES,
+            )
+
     async def get_profile_picture(self, access_token: str) -> Optional[str]:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -244,10 +275,7 @@ class YouTubePublisher(BaseSocialPublisher):
             if local_path and local_path.exists():
                 video_bytes = local_path.read_bytes()
             else:
-                vid_stream_resp = await client.get(video_url)
-                if vid_stream_resp.status_code >= 400:
-                    raise SocialPublishError(f"Failed to retrieve video asset for YouTube upload ({vid_stream_resp.status_code})")
-                video_bytes = vid_stream_resp.content
+                video_bytes, _ = await self._download_media_bytes(video_url)
 
             # 3. Stream binary video bytes into YouTube resumable upload location
             put_resp = await client.put(

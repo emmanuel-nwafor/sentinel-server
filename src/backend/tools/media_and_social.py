@@ -224,12 +224,22 @@ class MuxTool:
                             asset_data = asset_resp.json().get("data", {})
                             playback_ids = asset_data.get("playback_ids", [])
                             playback_id = playback_ids[0]["id"] if playback_ids else asset_id
+
+                            # Detect MP4 rendition filename (Mux standard: capped-1080p.mp4 or highest static rendition)
+                            static_files = asset_data.get("static_renditions", {}).get("files", [])
+                            mp4_name = "capped-1080p.mp4"
+                            for sf in static_files:
+                                name = sf.get("name", "")
+                                if name.endswith(".mp4"):
+                                    mp4_name = name
+                                    break
+
                             return {
                                 "status": "ready",
                                 "asset_id": asset_id,
                                 "playback_id": playback_id,
                                 "playback_url": f"https://stream.mux.com/{playback_id}.m3u8",
-                                "mp4_url": f"https://stream.mux.com/{playback_id}/high.mp4",
+                                "mp4_url": f"https://stream.mux.com/{playback_id}/{mp4_name}",
                                 "thumbnail_url": f"https://image.mux.com/{playback_id}/thumbnail.jpg",
                                 "is_sandbox": False,
                             }

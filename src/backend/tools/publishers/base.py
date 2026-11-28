@@ -89,8 +89,17 @@ class BaseSocialPublisher(ISocialPublisher, ABC):
 
     async def _download_media_bytes(self, url: str) -> Tuple[bytes, str]:
         """Download binary asset from Cloudinary or MUX URL for server-side upload."""
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             response = await client.get(url)
+            # Resilient fallback for MUX static renditions
+            if response.status_code >= 400 and "stream.mux.com" in url:
+                for candidate in ["capped-1080p.mp4", "high.mp4", "medium.mp4", "low.mp4"]:
+                    alt_url = "/".join(url.split("/")[:-1]) + f"/{candidate}"
+                    if alt_url != url:
+                        alt_resp = await client.get(alt_url)
+                        if alt_resp.status_code < 400:
+                            response = alt_resp
+                            break
             if response.status_code >= 400:
                 raise SocialPublishError(
                     f"Failed to fetch media asset from storage ({response.status_code})."
