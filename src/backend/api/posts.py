@@ -160,11 +160,30 @@ async def copilot_chat(
         "x_handle": x_acc["account_handle"] if x_acc else "",
     }
 
+    # Retrieve recent posts from PostgreSQL for agent context
+    recent_posts_info = []
+    try:
+        raw_posts = await uow.posts.get_user_posts(current_user.id)
+        for rp in (raw_posts or [])[:5]:
+            recent_posts_info.append({
+                "id": str(rp.id),
+                "status": rp.status,
+                "created_at": rp.created_at.isoformat() if rp.created_at else None,
+                "likes_count": rp.likes_count,
+                "comments_count": rp.comments_count,
+                "linkedin_preview": (rp.linkedin_text[:120] + "...") if rp.linkedin_text else None,
+                "x_preview": (rp.x_text[:120] + "...") if rp.x_text else None,
+            })
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Failed to fetch user recent posts: %s", exc)
+
     res = await agent.chat(
         request,
         brand_voice_prompt=brand_voice_prompt,
         connected_profiles_info=profiles_info,
         user_context=user_context,
+        recent_posts_info=recent_posts_info,
     )
 
     # Autonomous Direct Social Publishing Detection
