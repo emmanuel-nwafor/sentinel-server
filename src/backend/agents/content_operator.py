@@ -49,11 +49,51 @@ async def scrape_webpage_content(raw_url: str) -> Dict[str, Any]:
     """
     Real-time webpage scraper that extracts human-readable text,
     page title, meta descriptions, and architectural cues from any live website.
+    Uses Firecrawl API as primary headless engine (full JS/SPA rendering),
+    with async httpx + BeautifulSoup4 as automatic zero-dependency fallback.
     """
     url = raw_url.strip()
     if not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
 
+    # 1. Firecrawl Headless Browser Engine (Primary)
+    firecrawl_key = settings.FIRECRAWL_API_KEY or os.getenv("FIRECRAWL_API_KEY")
+    if firecrawl_key:
+        try:
+            fc_headers = {
+                "Authorization": f"Bearer {firecrawl_key}",
+                "Content-Type": "application/json",
+            }
+            fc_payload = {
+                "url": url,
+                "formats": ["markdown"],
+            }
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                fc_resp = await client.post(
+                    "https://api.firecrawl.dev/v1/scrape",
+                    json=fc_payload,
+                    headers=fc_headers,
+                )
+                if fc_resp.status_code == 200:
+                    fc_data = fc_resp.json()
+                    if fc_data.get("success") and fc_data.get("data"):
+                        d = fc_data["data"]
+                        md_text = d.get("markdown", "")[:8000]
+                        metadata = d.get("metadata", {}) or {}
+                        title = metadata.get("title") or metadata.get("og:title") or ""
+                        desc = metadata.get("description") or metadata.get("og:description") or ""
+                        return {
+                            "status": "success",
+                            "engine": "firecrawl",
+                            "target_url": url,
+                            "page_title": title,
+                            "meta_description": desc,
+                            "extracted_content": md_text,
+                        }
+        except Exception as fc_err:
+            logger.warning("Firecrawl scrape attempt failed (%s), falling back to native scraper", fc_err)
+
+    # 2. Native httpx + BeautifulSoup fallback
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -81,6 +121,7 @@ async def scrape_webpage_content(raw_url: str) -> Dict[str, Any]:
 
             return {
                 "status": "success",
+                "engine": "native_soup",
                 "target_url": str(resp.url),
                 "http_status": resp.status_code,
                 "page_title": title,

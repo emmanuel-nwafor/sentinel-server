@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.8-flash"
     OPENAI_API_KEY: str = ""
+    FIRECRAWL_API_KEY: str = ""
 
     # Monetization & Premium Feature Flags
     # By default, enforcement is disabled (False) so all users have unrestricted access in dev/early-stage
